@@ -1,0 +1,154 @@
+---
+sidebar_position: 6
+title: Compare and Obtain
+---
+
+# Compare and Obtain
+
+These two areas solve different problems, but they are often used together by the frontend:
+
+- compare helps users evaluate two files that already exist in the library
+- obtain helps users track missing content and enrich entries through TMDB
+
+## Compare: metadata and VMAF
+
+### Metadata compare
+
+`GET /api/compare?left_path=<absolute>&right_path=<absolute>`
+
+The backend loads both media entries from MongoDB and returns a row-based comparison payload.
+
+The response contains:
+
+- `history_id`
+- `left_path`
+- `right_path`
+- `generated_at_utc`
+- `properties[]`, where each row includes `key`, `label`, `left_value`, `right_value`, and `is_match`
+
+Every metadata comparison is also written to `compare_history` so it can be surfaced later.
+
+### VMAF jobs
+
+VMAF is not executed inline from the API request. It is queued.
+
+Create a job:
+
+```json
+{
+  "left_path": "D:\\Media\\Movies\\Movie-source.mkv",
+  "right_path": "D:\\Media\\Movies\\Movie-converted.mkv"
+}
+```
+
+Endpoint:
+
+`POST /api/compare/vmaf/jobs`
+
+Job states currently include:
+
+- `queued`
+- `running`
+- `completed`
+- `failed`
+
+Important behavior:
+
+- VMAF work is persisted in `compare_vmaf_jobs`
+- the backend keeps compare history in `compare_history`
+- the current implementation compares a `120` second window rather than the entire file
+- file reservation conflicts can cause `409 Conflict` if either path is already involved in active processing
+
+### Compare history endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/compare/history` | List the most recent compare history entries. |
+| `GET /api/compare/history/{historyId}` | Fetch one history item. |
+| `DELETE /api/compare/history/{historyId}` | Delete one history item, unless it is still running or queued. |
+| `DELETE /api/compare/history` | Clear history in bulk and receive deleted vs skipped counts. |
+
+## Obtain: track wanted content
+
+The obtain area stores titles you want to add to the library later. Entries live in MongoDB collection `obtain_list`.
+
+## Obtain endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/obtain` | List saved obtain items, newest first. |
+| `POST /api/obtain` | Add a manual obtain item or persist an already known TMDB-backed item. |
+| `POST /api/obtain/auto-match` | Infer title and year from a filename, search TMDB, and save the best match. |
+| `DELETE /api/obtain/{id}` | Remove an obtain list entry. |
+| `GET /api/obtain/search?query=...` | Search TMDB across supported media types. |
+| `GET /api/obtain/{mediaType}/{tmdbId}/titles` | Get alternate titles for a TMDB movie or TV item. |
+| `GET /api/obtain/{mediaType}/{tmdbId}/translations` | Get translation data for a TMDB movie or TV item. |
+
+## Manual add behavior
+
+`POST /api/obtain`
+
+```json
+{
+  "tmdb_id": 603,
+  "media_type": "movie",
+  "title": "The Matrix",
+  "release_year": 1999,
+  "overview": "A computer hacker learns the nature of reality.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/example.jpg",
+  "backdrop_url": "https://image.tmdb.org/t/p/w1280/example.jpg",
+  "user_score": 8.7,
+  "source_file_path": "D:\\Downloads\\The.Matrix.1999.mkv"
+}
+```
+
+Validation rules:
+
+- `title` is always required
+- when `tmdb_id` is provided, `media_type` must be `movie` or `tv`
+- without `tmdb_id`, `media_type` can be `movie`, `tv`, or `custom`
+
+Duplicate handling:
+
+- if a TMDB item with the same `tmdb_id` and `media_type` already exists, the API returns that existing item
+- for custom items, title matching is case-insensitive and also considers year plus `tmdb_id = null`
+
+## Auto-match behavior
+
+`POST /api/obtain/auto-match`
+
+```json
+{
+  "file_path": "D:\\Downloads\\Blade.Runner.2049.2017.2160p.mkv"
+}
+```
+
+The backend:
+
+1. extracts a candidate title from the filename
+2. tries to infer year and possible TV preference
+3. queries TMDB
+4. prefers exact year matches when a year is available
+5. scores candidates and saves the best match if confidence is high enough
+
+If no credible match is found, the API returns `404` rather than saving weak data.
+
+## TMDB requirements and failure modes
+
+TMDB-dependent endpoints require `TMDB_API_KEY`.
+
+Typical failure modes:
+
+- missing API key: backend returns `500`
+- upstream TMDB request failure: backend returns `502`
+- invalid `mediaType` for titles/translations: backend returns `400`
+- invalid or missing `tmdbId`: backend returns `400`
+
+## Frontend integration advice
+
+When you document or build the frontend later, this area naturally maps to:
+
+- compare detail pages
+- compare history views
+- obtain search drawers or dialogs
+- filename drop zones for auto-match

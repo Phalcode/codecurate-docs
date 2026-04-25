@@ -1,0 +1,75 @@
+---
+sidebar_position: 1
+title: Backend Overview
+---
+
+# Backend Overview
+
+The Codecurate backend is the API and media-processing core of the platform. It exposes authenticated endpoints for browsing media, running FFmpeg workflows, comparing files, and managing an obtain list backed by TMDB data.
+
+## What the backend is responsible for
+
+- Serving the HTTP API on port `5000`
+- Reading and writing platform data in MongoDB
+- Indexing media metadata from a configured media directory
+- Running queued FFmpeg jobs and persisting job history
+- Comparing media files by metadata and VMAF
+- Exposing OpenAPI documentation for client generation and debugging
+
+## Architecture at a glance
+
+| Area | What it does |
+| --- | --- |
+| `Program.cs` | Boots the app, loads `.env`, configures Kestrel, JWT auth, CORS, Swagger UI, and controller routing. |
+| Controllers | Expose REST endpoints grouped by domain: media, commands, filesystem, compare, and obtain. |
+| `MediaAnalysisService` | Runs background indexing, watches the media directory, and reconciles MongoDB with the filesystem. |
+| `MediaQueryService` | Applies search, path, language, and insight filters and computes insights/statistics payloads. |
+| `FfmpegProcessTracker` | Queues FFmpeg jobs, enforces concurrency limits, persists process state, and supports local or Docker execution. |
+| `MediaCompareService` | Runs metadata compare, queues VMAF jobs, and stores compare history. |
+| `TmdbSearchService` | Calls TMDB for search, alternate titles, translations, and filename-driven auto-match. |
+
+## Persistent storage
+
+The backend currently uses MongoDB database `codecurate` with these collections:
+
+| Collection | Purpose |
+| --- | --- |
+| `media` | Indexed media metadata produced by `ffprobe` and used by browse, insights, statistics, and compare metadata flows. |
+| `command_presets` | Saved FFmpeg command presets. |
+| `ffmpeg_jobs` | Persisted FFmpeg queue and process history so jobs survive restarts. |
+| `compare_vmaf_jobs` | Queued and completed VMAF comparison jobs. |
+| `compare_history` | Metadata compare history and VMAF result history. |
+| `obtain_list` | User-maintained obtain list entries, including TMDB-enriched items. |
+
+## Request model
+
+Almost the entire API is protected by JWT bearer authentication. The main exceptions are:
+
+- `GET /api/docs-yaml`
+- `GET /api/docs`
+- `GET /api/media/download` when called with a valid short-lived download ticket
+
+All controller routes are otherwise mapped behind `RequireAuthorization()`, so client applications should assume bearer auth is the default. See [Authentication and access](/docs/backend/authentication-and-access) for the exact rules.
+
+## Media lifecycle
+
+1. The backend starts and loads environment variables, including `.env` values when present.
+2. `MediaAnalysisService` performs an initial scan of `MEDIA_DIR` and stores or updates metadata for supported files.
+3. A file watcher listens for create, change, rename, and delete events, then debounces re-analysis.
+4. A periodic reconciliation pass removes stale MongoDB entries for files that no longer exist and indexes new files that were missed by watcher events.
+5. Query endpoints read from MongoDB, not directly from the filesystem, so indexed metadata is the source of truth for browse and compare operations.
+
+## Operational characteristics
+
+- The backend always binds to port `5000`.
+- Uploads can be large. The default max request body size is `50 GB` unless `MEDIA_UPLOAD_MAX_BYTES` overrides it.
+- FFmpeg execution is queue-based, with `FFMPEG_MAX_PARALLEL_PROCESSES` defaulting to `1`.
+- Compare VMAF work is also queued and persisted.
+- Swagger UI serves the YAML exposed at `/api/docs-yaml`.
+
+## Where to go next
+
+- Read [Getting started](/docs/backend/getting-started) to run the service.
+- Read [Media library](/docs/backend/media-library) if you are building browse and file-management features.
+- Read [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg) if you are integrating command presets or job monitoring.
+- Read [Compare and obtain](/docs/backend/compare-and-obtain) for TMDB, metadata compare, and VMAF workflows.

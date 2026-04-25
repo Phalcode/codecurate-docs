@@ -1,0 +1,209 @@
+---
+sidebar_position: 4
+title: Media Library
+---
+
+# Media Library
+
+The media library endpoints sit on top of indexed metadata in MongoDB. The backend does not browse media files directly for every request; instead, `MediaAnalysisService` keeps the `media` collection in sync with `MEDIA_DIR`.
+
+## Indexing and synchronization
+
+### What happens at startup
+
+When the backend starts:
+
+1. it ensures the `media` collection can support unique path handling
+2. it scans `MEDIA_DIR` recursively
+3. it analyzes supported media files with `ffprobe`
+4. it stores new or changed metadata in MongoDB
+5. it removes stale DB entries for files that no longer exist
+
+### What happens while the app is running
+
+- a file watcher listens for create, change, rename, and delete events
+- changed files are re-analyzed after a debounce period
+- a full reconciliation pass runs every `10` minutes by default, controlled by `MEDIA_RESCAN_INTERVAL_MINUTES`
+
+This design makes the API resilient to missed watcher events and external file operations.
+
+## Core endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/media` | Paginated media listing with search and filters. |
+| `GET /api/media/insights` | Returns distributions used for filter panels and insight summaries. |
+| `GET /api/media/statistics` | Returns top-level totals and shares such as AV1 and Opus usage. |
+| `DELETE /api/media` | Deletes a media file from disk and removes matching DB entries. |
+| `POST /api/media/rename` | Renames a file on disk and updates stored metadata paths. |
+| `POST /api/media/upload` | Multipart upload into a path under `MEDIA_DIR`, with immediate indexing attempt. |
+| `POST /api/media/download-ticket` | Issues a short-lived download ticket for an existing file. |
+| `GET /api/media/download` | Streams a file when given a valid path-bound ticket. |
+
+## Query parameters for `GET /api/media`
+
+| Parameter | Type | Purpose |
+| --- | --- | --- |
+| `search` | string | Case-insensitive match against file title and path. |
+| `path` | string | Restrict results to a path prefix or subtree. |
+| `insight_filter` | repeated string | Include only items matching one or more insight clauses. |
+| `exclude_insight_filter` | repeated string | Exclude items matching one or more insight clauses. |
+| `audio_language` | string | Include only items with at least one matching audio language. |
+| `exclude_audio_language` | string | Exclude items with a matching audio language. |
+| `subtitle_language` | string | Include only items with at least one matching subtitle language. |
+| `exclude_subtitle_language` | string | Exclude items with a matching subtitle language. |
+| `limit` | int | Page size. |
+| `skip` | int | Offset for pagination. |
+
+## Insight filter syntax
+
+Insight filters use `kind:key` and can be repeated.
+
+Supported kinds:
+
+- `video_codec`
+- `audio_codec`
+- `resolution`
+- `bitrate`
+- `format`
+
+Examples:
+
+```text
+video_codec:AV1
+audio_codec:Opus
+resolution:1080p
+bitrate:good
+format:mkv
+```
+
+Notes:
+
+- format values normalize to lowercase file extensions such as `.mkv` or `.mp4`
+- bitrate values are bucket names such as `unknown`, `trash`, `low`, `fair`, `good`, and `high`
+- resolution accepts values like `2160p+`, `1440p`, `1080p`, `720p`, `576p`, `SD`, and `Unknown`
+
+## Language filtering
+
+Language filters normalize common aliases automatically. For example:
+
+- `eng` becomes `en`
+- `deu` and `ger` become `de`
+- `fra` and `fre` become `fr`
+
+Use `unknown` if you want to target tracks whose language metadata is missing or unusable.
+
+## Example browse requests
+
+### Search within a subtree
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5000/api/media?path=D:\\Media\\Movies&search=Blade&limit=25"
+```
+
+### Combine include and exclude filters
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5000/api/media?insight_filter=video_codec:AV1&insight_filter=audio_codec:Opus&exclude_insight_filter=bitrate:trash"
+```
+
+### Request filter-panel data
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5000/api/media/insights?path=D:\\Media\\TV"
+```
+
+## Insights and statistics payloads
+
+`GET /api/media/insights` returns distributions for:
+
+- `video_codecs`
+- `audio_codecs`
+- `resolutions`
+- `bitrate_health`
+- `file_formats`
+- `audio_languages`
+- `subtitle_languages`
+
+`GET /api/media/statistics` returns:
+
+- `total_files`
+- `av1_share`
+- `opus_share`
+- codec, resolution, and bitrate distributions
+
+These endpoints are ideal for dashboards, filter sidebars, and summary cards in the frontend.
+
+## Rename and delete behavior
+
+### Rename
+
+`POST /api/media/rename`
+
+```json
+{
+  "path": "D:\\Media\\Movies\\Movie.mkv",
+  "new_name": "Movie - Director Cut"
+}
+```
+
+Behavior:
+
+- `path` must be absolute
+- `new_name` cannot contain directory separators
+- if `new_name` has no extension, the original extension is kept
+- if the destination file already exists, the API returns `409 Conflict`
+- matching media documents are updated with the new path and title
+
+### Delete
+
+`DELETE /api/media?path=<absolute-path>`
+
+Behavior:
+
+- `path` must be absolute
+- if the file exists on disk, the backend deletes it first
+- matching MongoDB documents are then removed
+- if neither the file nor the DB entry exists, the API returns `404`
+
+## Uploads
+
+`POST /api/media/upload` expects multipart form fields:
+
+- `path`: required absolute directory path
+- `subfolder`: optional relative subfolder under `path`
+- `files`: one or more uploaded files
+
+Important safeguards:
+
+- `path` must stay inside `MEDIA_DIR`
+- `subfolder` cannot be absolute and cannot contain `.` or `..` segments
+- invalid filenames are rejected
+- duplicate destination files are skipped rather than overwritten
+
+The response separates results into:
+
+- `uploaded_files`
+- `skipped_files`
+- `failed_files`
+
+Each uploaded file also reports whether indexing succeeded immediately through the `indexed` flag.
+
+## Downloads
+
+Downloads use a ticketed two-step flow documented in [Authentication and access](/docs/backend/authentication-and-access). The important operational detail is that the actual download route is anonymous, but only for requests carrying a valid short-lived ticket tied to one exact absolute path.
+
+## Filesystem tree endpoint
+
+`GET /api/filesystem` returns a recursive directory tree rooted at `MEDIA_DIR`.
+
+This is useful for:
+
+- folder pickers in the frontend
+- upload target selection
+- browse-path filters
+
+If `MEDIA_DIR` is missing or does not exist, the endpoint returns `404`.

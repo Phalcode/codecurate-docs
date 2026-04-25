@@ -1,0 +1,127 @@
+---
+sidebar_position: 3
+title: Authentication and Access
+---
+
+# Authentication and Access
+
+The backend is designed to be used by authenticated clients. In practice, you should treat bearer authentication as the default for every controller endpoint.
+
+## Authentication model
+
+The backend uses the ASP.NET Core JWT bearer handler with these rules:
+
+- `Authority` comes from `OIDC_AUTHORITY`
+- issuer validation is enabled
+- audience validation is disabled
+- the effective user name claim is `preferred_username`
+- HTTPS metadata is required for OIDC discovery
+
+### Allowed client check
+
+After token validation, the backend applies an additional client allowlist check:
+
+1. Read `azp` from the token if present.
+2. Otherwise read `client_id`.
+3. Compare the resulting value against `OIDC_ALLOWED_CLIENTS`.
+
+If the client is missing or not on the allowlist, the request is rejected even if the token itself is otherwise valid.
+
+## Public vs protected routes
+
+| Route | Access | Notes |
+| --- | --- | --- |
+| `GET /api/docs-yaml` | Public | Returns the OpenAPI YAML file. |
+| `GET /api/docs` | Public | Swagger UI wired to `/api/docs-yaml`. |
+| `GET /api/media/download` | Public with ticket | Requires a matching, unexpired download ticket. |
+| All controller routes under `/api/media`, `/api/commands`, `/api/filesystem`, `/api/compare`, `/api/obtain` | Bearer token required | Controllers are mapped with `RequireAuthorization()`. |
+
+## CORS
+
+The backend registers a single CORS policy named `FrontendOrigins`.
+
+- Allowed origins come from `FRONTEND_ORIGINS`
+- Allowed methods: any
+- Allowed headers: any
+- Default origins when the variable is not set:
+  - `http://localhost:5173`
+  - `https://localhost:5173`
+
+If your frontend runs from a different origin, add it explicitly to `FRONTEND_ORIGINS` as a comma-separated list.
+
+## Sending authenticated requests
+
+Typical API calls should include:
+
+```http
+Authorization: Bearer <access-token>
+```
+
+Example:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5000/api/media?limit=25&skip=0"
+```
+
+## Secure download flow
+
+Media downloads are intentionally split into two steps.
+
+### Step 1: request a download ticket
+
+`POST /api/media/download-ticket?path=<absolute-path>`
+
+Requirements:
+
+- bearer authentication is required
+- `path` must be absolute
+- the file must exist
+
+The response contains:
+
+- `ticket`
+- `expires_in_seconds`, currently `300`
+
+Example:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5000/api/media/download-ticket?path=D:\\Media\\Movie.mkv"
+```
+
+### Step 2: use the ticket on the anonymous download route
+
+`GET /api/media/download?path=<absolute-path>&ticket=<ticket>`
+
+The backend validates that:
+
+- the ticket can be decrypted
+- the ticket has not expired
+- the path in the ticket exactly matches the requested path
+- the file still exists
+
+If validation passes, the API streams the file with range requests enabled.
+
+## What can fail
+
+Common authentication and access failures:
+
+| Scenario | Result |
+| --- | --- |
+| `OIDC_AUTHORITY` missing | Startup fails. |
+| Token issuer is wrong | Request is rejected during JWT validation. |
+| Token client is not allowed | Request fails with `Token client is not allowed.` |
+| Origin is not in `FRONTEND_ORIGINS` | Browser requests fail CORS checks. |
+| Download ticket missing or expired | `GET /api/media/download` returns `401 Unauthorized`. |
+| Download ticket does not match `path` | `GET /api/media/download` returns `401 Unauthorized`. |
+
+## Integration guidance for the future frontend
+
+When you document or build the frontend later, this page is the contract to carry forward:
+
+- keep access tokens scoped to allowed OIDC clients
+- call protected endpoints with bearer auth
+- treat download as a ticketed flow, not a direct authenticated file URL
+- align the frontend origin with `FRONTEND_ORIGINS`

@@ -1,23 +1,179 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
-
 .heroBanner {
-  padding: 4rem 0;
-  text-align: center;
+  padding: 5rem 0 3rem;
   position: relative;
   overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(255, 122, 89, 0.22), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(13, 142, 114, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 247, 242, 0.92));
+}
+
+.heroGrid {
+  display: grid;
+  gap: 2rem;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--doc-accent);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(3.2rem, 7vw, 5.4rem);
+  line-height: 0.95;
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 500;
+  color: #17453b;
+  max-width: 40rem;
+}
+
+.heroBody {
+  margin: 0;
+  max-width: 41rem;
+  font-size: 1.02rem;
+  line-height: 1.8;
+  color: #244239;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  padding-top: 0.5rem;
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.9rem 1.3rem;
+  border-radius: 999px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.primaryAction {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d8e72, #0f6a82);
+  box-shadow: 0 18px 40px rgba(13, 106, 130, 0.2);
+}
+
+.secondaryAction {
+  color: #173d34;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(16, 42, 36, 0.1);
+}
+
+.primaryAction:hover,
+.secondaryAction:hover {
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.heroPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panelCard,
+.quickStrip {
+  border: 1px solid rgba(16, 42, 36, 0.08);
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 50px rgba(16, 42, 36, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.panelCard {
+  padding: 1.4rem;
+}
+
+.panelLabel {
+  display: inline-flex;
+  margin-bottom: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0f6a82;
+}
+
+.panelValue {
+  display: block;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: #102a24;
+}
+
+.panelText {
+  margin: 0.7rem 0 0;
+  color: #34544a;
+  line-height: 1.7;
+}
+
+.quickStrip {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem 1.3rem;
+}
+
+.quickStripLabel {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ff7a59;
 }
 
 @media screen and (max-width: 996px) {
   .heroBanner {
-    padding: 2rem;
+    padding: 3.5rem 0 2rem;
+  }
+
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.8rem, 13vw, 4.2rem);
   }
 }
 
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@media screen and (max-width: 640px) {
+  .heroBanner {
+    padding: 2.75rem 0 1.5rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    width: 100%;
+  }
 }

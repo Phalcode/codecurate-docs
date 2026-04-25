@@ -1,47 +1,59 @@
 ---
 sidebar_position: 1
+title: Codecurate Documentation
 ---
 
-# Tutorial Intro
+# Codecurate Documentation
 
-Let's discover **Docusaurus in less than 5 minutes**.
+This site is organized so backend and frontend documentation can grow independently without having to reshuffle the navigation later.
 
-## Getting Started
+Both the backend and frontend sections are now documented from the current codebases. The split is still intentional: backend pages remain the source of truth for API and operational behavior, while frontend pages focus on application structure, auth flow, API integration, and user workflows.
 
-Get started by **creating a new site**.
+## Documentation map
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+- [Backend overview](/docs/backend/overview) explains the runtime architecture, storage model, and major services.
+- [Getting started](/docs/backend/getting-started) covers prerequisites, configuration, local development, and Docker notes.
+- [Authentication and access](/docs/backend/authentication-and-access) explains JWT requirements, client restrictions, CORS, and secure downloads.
+- [Media library](/docs/backend/media-library) documents indexing, querying, uploads, renames, deletes, and filter syntax.
+- [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg) covers command presets, job lifecycle, worker modes, and queue behavior.
+- [Compare and obtain](/docs/backend/compare-and-obtain) documents metadata compare, VMAF workflows, history, and TMDB-backed obtain flows.
+- [API reference](/docs/backend/api-reference) is the endpoint-by-endpoint quick lookup.
+- [Frontend overview](/docs/frontend/overview) explains the React application shell, route map, and major feature areas.
+- [Frontend getting started](/docs/frontend/getting-started) covers prerequisites, scripts, environment variables, and OpenAPI generation.
+- [Frontend authentication and API](/docs/frontend/authentication-and-api) documents OIDC, silent renew, unauthorized retry behavior, and generated client usage.
+- [Frontend workflows](/docs/frontend/workflows) maps the main pages to backend capabilities and user flows.
 
-### What you'll need
+## Start here
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+If you are deploying or developing the backend first, read these pages in order:
 
-## Generate a new site
+1. [Backend overview](/docs/backend/overview)
+2. [Getting started](/docs/backend/getting-started)
+3. [Authentication and access](/docs/backend/authentication-and-access)
+4. [Media library](/docs/backend/media-library)
 
-Generate a new Docusaurus site using the **classic template**.
+If you are integrating a client application, the fastest path is:
 
-The classic template will automatically be added to your project after you run the command:
+1. [Authentication and access](/docs/backend/authentication-and-access)
+2. [API reference](/docs/backend/api-reference)
+3. [Compare and obtain](/docs/backend/compare-and-obtain)
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+## Current backend scope
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+- ASP.NET Core API hosted on port `5000`
+- MongoDB-backed metadata, queue, compare, and obtain storage
+- Background media indexing with file watching and periodic reconciliation
+- FFmpeg command preset execution with local and Docker worker modes
+- Metadata compare and queued VMAF calculation workflows
+- TMDB-backed search, translations, titles, and obtain-list automation
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+## Notes for future frontend docs
 
-## Start your site
+The frontend section is now documented at a high level and already has room for deeper additions such as:
 
-Run the development server:
+- application architecture and page map
+- authentication flow and token handling
+- API client usage against the backend documented here
+- media, compare, command, and obtain user workflows
 
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+When frontend docs are added, the backend pages can remain stable and keep acting as the source of truth for the API and operational behavior.

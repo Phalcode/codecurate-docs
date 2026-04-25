@@ -1,0 +1,145 @@
+---
+sidebar_position: 2
+title: Getting Started
+---
+
+# Getting Started
+
+This page covers the backend runtime requirements, configuration, and local startup flow.
+
+## Prerequisites
+
+You need these components before the backend can run successfully:
+
+- .NET SDK 10
+- A MongoDB instance reachable from the backend process
+- `ffmpeg` and `ffprobe` available in the runtime environment for indexing and command execution
+- An OIDC provider reachable over HTTPS
+- A media library directory for indexing and uploads
+
+TMDB is optional unless you intend to use obtain search, alternate titles, translations, or filename auto-match.
+
+## Runtime defaults
+
+- API bind address: all interfaces on port `5000`
+- Default frontend origins: `http://localhost:5173`, `https://localhost:5173`
+- Default upload size limit: `50 GB`
+- Default media reconcile interval: `10 minutes`
+- Default FFmpeg parallelism: `1`
+- Default FFmpeg execution mode: `local`
+- Default allowed OIDC client: `codecurate-frontend`
+
+## Environment variables
+
+### Core runtime
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `OIDC_AUTHORITY` | Yes | OIDC issuer / discovery URL used for JWT validation. | Startup fails if missing. HTTPS metadata is required. |
+| `FRONTEND_ORIGINS` | No | Comma-separated origins allowed by CORS. | Defaults to localhost Vite origins. |
+| `MEDIA_DIR` | Yes for indexing, filesystem, and uploads | Root media directory watched and indexed by the backend. | If missing or invalid, indexing and filesystem endpoints cannot operate correctly. |
+| `MEDIA_UPLOAD_MAX_BYTES` | No | Max request size for uploads. | Defaults to `53687091200` bytes (`50 GB`). |
+| `MEDIA_RESCAN_INTERVAL_MINUTES` | No | Periodic reconciliation interval for media indexing. | Defaults to `10`. |
+
+### MongoDB
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `DB_URL` | Yes | MongoDB host or connection target. | In `DEBUG`, the backend connects to `mongodb://{DB_URL}`. |
+| `DB_USERNAME` | Required outside `DEBUG` | MongoDB username. | Used to build the connection string in non-debug runs. |
+| `DB_PASSWORD` | Required outside `DEBUG` | MongoDB password. | Used to build the connection string in non-debug runs. |
+
+### Authentication
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `OIDC_ALLOWED_CLIENTS` | No | Comma-separated list of allowed token clients. | Defaults to `codecurate-frontend`. The backend checks `azp` first, then `client_id`. |
+
+### TMDB
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `TMDB_API_KEY` | Required for obtain search features | Enables TMDB search, title lookup, translation lookup, and auto-match. | Missing key causes those operations to fail at runtime. |
+
+### FFmpeg scheduler and workers
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `FFMPEG_MAX_PARALLEL_PROCESSES` | No | Maximum concurrent FFmpeg jobs. | Defaults to `1`. |
+| `FFMPEG_EXECUTION_MODE` | No | Execution backend. | `local` by default, `docker` for worker containers. |
+| `FFMPEG_WORKER_PROFILE` | No | Simplified worker profile. | Defaults to `cpu`; also supports `intel`, `amd`, `nvidia`. |
+| `FFMPEG_WORKER_IMAGE` | No | Docker image used for worker containers. | Defaults to `linuxserver/ffmpeg`. |
+| `FFMPEG_WORKER_INCLUDE_FFMPEG_BINARY` | No | Prepends literal `ffmpeg` inside worker commands. | Defaults to `false`. |
+| `FFMPEG_WORKER_DRI_GROUPS` | No | Extra Linux groups passed to Intel or AMD workers. | Optional comma-separated list such as `video,render`. |
+| `FFMPEG_WORKER_NVIDIA_VISIBLE_DEVICES` | No | Visible NVIDIA devices in Docker mode. | Defaults to `all`. |
+| `FFMPEG_WORKER_NVIDIA_DRIVER_CAPABILITIES` | No | NVIDIA driver capability list. | Defaults to `video,compute,utility`. |
+| `FFMPEG_WORKER_PASS_DRI` | No | Legacy compatibility flag for passing `/dev/dri`. | Used for older Intel-style behavior. |
+| `DOCKER_HOST_SOCKET` | No | Docker socket path mounted inside the backend container. | Defaults to `/var/run/docker.sock`. |
+
+## `.env` loading behavior
+
+The backend looks for a `.env` file by walking upward from the app base directory. Each `KEY=VALUE` pair is loaded only when that variable is not already set in the environment.
+
+That means process-level or container-level environment variables always win over `.env` values.
+
+## Example `.env`
+
+```env
+OIDC_AUTHORITY=https://your-oidc-provider.example.com/realms/codecurate
+OIDC_ALLOWED_CLIENTS=codecurate-frontend
+FRONTEND_ORIGINS=http://localhost:5173,https://localhost:5173
+DB_URL=localhost:27017
+DB_USERNAME=codecurate
+DB_PASSWORD=change-me
+MEDIA_DIR=D:\Media
+MEDIA_UPLOAD_MAX_BYTES=53687091200
+MEDIA_RESCAN_INTERVAL_MINUTES=10
+TMDB_API_KEY=your-tmdb-key
+FFMPEG_MAX_PARALLEL_PROCESSES=1
+FFMPEG_EXECUTION_MODE=local
+FFMPEG_WORKER_PROFILE=cpu
+```
+
+## Running locally
+
+From the backend repository root:
+
+```bash
+dotnet restore
+dotnet build Codecurate.sln
+dotnet run --project Codecurate/Codecurate.csproj
+```
+
+When startup succeeds:
+
+- the API listens on `http://localhost:5000`
+- the OpenAPI YAML is available at `http://localhost:5000/api/docs-yaml`
+- Swagger UI is available at `http://localhost:5000/api/docs`
+
+## Docker notes
+
+From the backend repository root:
+
+```bash
+docker build -t codecurate-backend .
+docker run --rm -p 5000:5000 --env-file .env codecurate-backend
+```
+
+If you enable Docker-based FFmpeg workers, make sure:
+
+- the Docker socket is mounted into the backend container
+- media paths are mounted in a way that both the backend container and spawned worker containers can see the same files
+- `/dev/dri` is passed when using Intel or AMD worker profiles
+
+## First things to test after startup
+
+1. Open `/api/docs` to confirm the service is reachable.
+2. Call an authenticated endpoint such as `GET /api/filesystem` to verify JWT and CORS configuration.
+3. Confirm that `MEDIA_DIR` is valid and that the initial scan starts indexing files.
+4. Create or upload a test media file and verify it appears in `GET /api/media`.
+
+## Recommended next pages
+
+- [Authentication and access](/docs/backend/authentication-and-access)
+- [Media library](/docs/backend/media-library)
+- [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg)

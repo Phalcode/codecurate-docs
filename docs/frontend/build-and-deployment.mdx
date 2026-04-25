@@ -1,0 +1,79 @@
+---
+sidebar_position: 6
+title: Build and Deployment
+---
+
+# Build and Deployment
+
+The frontend is designed as a standard browser-based SPA build served by Nginx.
+
+## Production build
+
+Build the app with:
+
+```bash
+pnpm build
+```
+
+This produces static assets in `dist`.
+
+## Docker image
+
+The repository includes a two-stage Dockerfile.
+
+### Build stage
+
+- base image: `guergeiro/pnpm:lts-latest-alpine`
+- working directory: `/build`
+- installs `openjdk21`
+- runs `pnpm i` and `pnpm build`
+
+The Java runtime is needed because the project uses OpenAPI Generator during dependency installation or regeneration.
+
+### Runtime stage
+
+- base image: `nginx:stable-alpine`
+- clears the default Nginx web root
+- copies `deployment/default.conf`
+- copies the built `dist` assets into `/usr/share/nginx/html`
+- exposes port `80`
+
+## Nginx routing behavior
+
+The shipped Nginx config is set up for an SPA with hashed assets:
+
+- `/assets/` files are served directly and cached for a long time
+- `/index.html` is kept non-cached so new deployments pick up new hashed assets quickly
+- all other unmatched paths fall back to `/index.html`
+
+That fallback is required because the app uses `BrowserRouter` and expects client-side routes such as `/browse`, `/compare`, and `/auth/callback` to resolve correctly after a page refresh.
+
+## Security headers in the Nginx config
+
+The provided config adds headers such as:
+
+- `Strict-Transport-Security`
+- `Content-Security-Policy`
+- `Referrer-Policy`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+- `Permissions-Policy`
+
+If you change hosting behavior, keep those headers or replace them with equivalents.
+
+## Deployment checklist
+
+1. Set the correct `VITE_API_BASE_URL` and OIDC variables before building.
+2. Make sure the OIDC provider allows the deployed callback and logout URLs.
+3. Confirm the backend CORS configuration includes the deployed frontend origin.
+4. Serve the frontend with SPA fallback routing.
+5. Verify `/auth/callback` and `/auth/silent-callback` work in the deployed environment.
+
+## Regenerating the API client in CI or image builds
+
+Because the project generates the OpenAPI client as part of installation, your build environment should either:
+
+- allow access to the hosted backend spec, or
+- have the local backend spec available for the fallback generation path
+
+If that is not possible in a deployment environment, you may want to commit generated client output or adjust the install/generation workflow accordingly.

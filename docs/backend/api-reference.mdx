@@ -1,0 +1,116 @@
+---
+sidebar_position: 7
+title: API Reference
+---
+
+# API Reference
+
+All paths below are relative to the backend base URL, typically `http://localhost:5000` during local development.
+
+## Public and tooling endpoints
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/docs-yaml` | Public | Download the OpenAPI YAML. |
+| `GET` | `/api/docs` | Public | Open Swagger UI for the backend API. |
+
+## Media
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/media` | Bearer | List media entries with search, filters, and pagination. |
+| `GET` | `/api/media/insights` | Bearer | Return codec, resolution, bitrate, format, and language distributions. |
+| `GET` | `/api/media/statistics` | Bearer | Return top-level library statistics such as total files and AV1 / Opus share. |
+| `DELETE` | `/api/media` | Bearer | Delete a media file and matching DB entries by absolute path. |
+| `POST` | `/api/media/rename` | Bearer | Rename a media file and update stored metadata. |
+| `POST` | `/api/media/upload` | Bearer | Upload one or more files into a directory under `MEDIA_DIR`. |
+| `POST` | `/api/media/download-ticket` | Bearer | Issue a 5-minute download ticket for one file path. |
+| `GET` | `/api/media/download` | Ticket | Stream the file matched by a valid ticket. |
+
+## Filesystem
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/filesystem` | Bearer | Return a recursive directory tree rooted at `MEDIA_DIR`. |
+
+## Commands and FFmpeg
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/commands` | Bearer | List saved command presets. |
+| `POST` | `/api/commands` | Bearer | Create a command preset. |
+| `PUT` | `/api/commands/{id}` | Bearer | Update a command preset. |
+| `DELETE` | `/api/commands/{id}` | Bearer | Delete a command preset. |
+| `POST` | `/api/commands/{id}/run` | Bearer | Queue a preset against one input file. |
+| `GET` | `/api/commands/processes` | Bearer | List queued, running, and completed jobs. |
+| `GET` | `/api/commands/processes/{processId}` | Bearer | Get one job including stdout and stderr. |
+| `DELETE` | `/api/commands/processes/{processId}` | Bearer | Remove a finished job record. |
+| `POST` | `/api/commands/processes/{processId}/kill` | Bearer | Stop a running job or cancel a queued one. |
+| `POST` | `/api/commands/processes/clear-completed` | Bearer | Remove completed job records in bulk. |
+
+## Compare
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/compare` | Bearer | Compare metadata for two indexed media paths. |
+| `POST` | `/api/compare/vmaf/jobs` | Bearer | Queue a VMAF comparison job. |
+| `GET` | `/api/compare/vmaf/jobs/{jobId}` | Bearer | Fetch one VMAF job. |
+| `GET` | `/api/compare/vmaf/jobs` | Bearer | List VMAF job history. |
+| `GET` | `/api/compare/history` | Bearer | List compare history entries. |
+| `GET` | `/api/compare/history/{historyId}` | Bearer | Fetch one compare history entry. |
+| `DELETE` | `/api/compare/history/{historyId}` | Bearer | Delete one compare history item if not active. |
+| `DELETE` | `/api/compare/history` | Bearer | Clear compare history in bulk. |
+
+## Obtain and TMDB
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/obtain` | Bearer | List obtain items. |
+| `GET` | `/api/obtain/search` | Bearer | Search TMDB. |
+| `GET` | `/api/obtain/{mediaType}/{tmdbId}/titles` | Bearer | Get alternate TMDB titles. |
+| `GET` | `/api/obtain/{mediaType}/{tmdbId}/translations` | Bearer | Get TMDB translations. |
+| `POST` | `/api/obtain` | Bearer | Create or resolve a manual obtain item. |
+| `POST` | `/api/obtain/auto-match` | Bearer | Infer a TMDB item from a filename and save it. |
+| `DELETE` | `/api/obtain/{id}` | Bearer | Remove an obtain entry. |
+
+## Common payload snippets
+
+### Rename media
+
+```json
+{
+  "path": "D:\\Media\\Movies\\Movie.mkv",
+  "new_name": "Movie - Remux"
+}
+```
+
+### Run command preset
+
+```json
+{
+  "input_path": "D:\\Media\\Movies\\Movie.mkv"
+}
+```
+
+### Create VMAF job
+
+```json
+{
+  "left_path": "D:\\Media\\Movies\\Movie-source.mkv",
+  "right_path": "D:\\Media\\Movies\\Movie-converted.mkv"
+}
+```
+
+### Auto-match obtain item
+
+```json
+{
+  "file_path": "D:\\Downloads\\Show.Name.S01E01.1080p.mkv"
+}
+```
+
+## Which page to use for detail
+
+- Read [Media library](/docs/backend/media-library) for filters, uploads, rename, delete, and download flow.
+- Read [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg) for preset semantics and queue behavior.
+- Read [Compare and obtain](/docs/backend/compare-and-obtain) for VMAF, compare history, and TMDB integration.

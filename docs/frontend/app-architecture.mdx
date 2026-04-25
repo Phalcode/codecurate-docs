@@ -1,0 +1,97 @@
+---
+sidebar_position: 3
+title: App Architecture
+---
+
+# App Architecture
+
+The frontend is structured around a protected dashboard shell with route-level pages and a service layer that keeps most backend coupling out of the presentational components.
+
+## High-level structure
+
+| Area | Responsibility |
+| --- | --- |
+| `src/main.tsx` | App bootstrap, providers, router, lazy-loaded routes. |
+| `src/context` | Authentication, i18n, folder browser state, sidebar counts, and alert dialog state. |
+| `src/layouts/DashboardLayout.tsx` | Shared app shell for authenticated pages. |
+| `src/pages` | Route-level screens such as Browse, Commands, Jobs, Compare, and Obtain. |
+| `src/components` | Reusable UI and feature components. |
+| `src/services` | API-facing wrappers over the generated OpenAPI client. |
+| `src/api` | Generated client code from the backend OpenAPI specification. |
+
+## Router composition
+
+The app uses `BrowserRouter` and wraps its protected area like this:
+
+1. public auth callback routes are defined first
+2. all main product pages sit under `RequireAuth`
+3. `RequireAuth` renders `DashboardLayout` only when the user is authenticated
+4. the index route redirects to `/browse`
+5. `/statistics` currently redirects back to `/browse`
+
+This keeps login handling centralized and prevents protected UI from rendering before auth state is known.
+
+## Dashboard shell
+
+`DashboardLayout` combines:
+
+- the top navbar
+- the primary sidebar
+- the folder browser provider
+- the sidebar counts provider
+- the routed page content via `Outlet`
+
+The sidebar is not just navigation. It also surfaces:
+
+- total media file count
+- active job count
+- command preset count
+- obtain list count
+- folder tree browsing
+- theme and language switches
+
+## State boundaries
+
+The app keeps state close to the page that owns it, with a few shared contexts for cross-cutting concerns.
+
+### Shared context state
+
+| Context | Purpose |
+| --- | --- |
+| `AuthContext` | OIDC user session, login, logout, display name, loading state. |
+| `I18nContext` | Active language and translation lookup. |
+| `AlertDialogContext` | Confirmation and feedback dialogs. |
+| `FolderBrowserContext` | Shared folder tree state used by browse and upload flows. |
+| `SidebarCountsContext` | Small summary counts shown in the sidebar. |
+
+### Page-owned state
+
+- Browse owns search, filters, sorting, upload dialog state, and compare selection
+- Commands owns preset editing and create/edit mode
+- Jobs owns polling state, selected process details, filtering, and destructive job actions
+- Compare owns current left/right paths, metadata result, notices, and compare history interactions
+- Obtain owns TMDB search, queue filters, preferred translation language, and list mutations
+
+## URL and local-storage behavior
+
+The frontend uses both the URL and local storage to preserve workflow state.
+
+Examples:
+
+- browse search, filter, and sorting state are mirrored into query parameters
+- compare paths can be restored from query parameters or from a cached compare selection
+- language selection is stored in local storage
+- some queue preferences on the obtain page are stored in local storage
+- auth flow metadata such as return paths and redirect throttling timestamps are stored in session storage
+
+## Design and component style
+
+The app uses a Tailwind-based component library under `src/components/tailwind` for common primitives such as buttons, dialogs, inputs, nav, sidebar, and layout elements. That keeps feature pages relatively focused on workflow logic rather than repeated styling code.
+
+## Why this architecture works well here
+
+- auth concerns are centralized
+- page routes are easy to reason about
+- backend coupling lives mostly in the service layer
+- shared shell concerns are isolated from feature implementations
+- generated API code can be regenerated without rewriting the entire UI

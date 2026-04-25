@@ -1,0 +1,120 @@
+---
+sidebar_position: 2
+title: Getting Started
+---
+
+# Getting Started
+
+This page covers the frontend runtime prerequisites, scripts, environment variables, and local startup flow.
+
+## Prerequisites
+
+You need:
+
+- Node.js 20 or later
+- `pnpm`
+- a reachable Codecurate backend
+- an OIDC provider configuration that matches both frontend and backend
+
+## Tech stack
+
+- React 19 + TypeScript
+- Vite
+- Tailwind CSS
+- React Router
+- `oidc-client-ts`
+- generated OpenAPI client via `typescript-fetch`
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Start the Vite development server. |
+| `pnpm start` | Start Vite with clear screen disabled. |
+| `pnpm build` | Produce the production build in `dist`. |
+| `pnpm lint` | Run Prettier and ESLint. |
+| `pnpm generate:api:remote` | Regenerate `src/api` from the hosted backend spec. |
+| `pnpm generate:api:local` | Regenerate `src/api` from the local backend spec file. |
+
+## Environment variables
+
+The frontend reads its runtime configuration from Vite environment variables.
+
+| Variable | Required | Purpose | Default / behavior |
+| --- | --- | --- | --- |
+| `VITE_API_BASE_URL` | No | Backend API base URL including `/api`. | Defaults to `https://codecurate-backend.alfagun74.de/api`. |
+| `VITE_OIDC_AUTHORITY` | Yes in real deployments | OIDC authority URL. | No useful fallback; authentication depends on it. |
+| `VITE_OIDC_CLIENT_ID` | No | OIDC client ID. | Defaults to `codecurate-frontend`. |
+| `VITE_OIDC_SCOPE` | No | Requested scopes. | Defaults to `openid profile email`. |
+| `VITE_OIDC_REDIRECT_URI` | No | Redirect URI for the main sign-in callback. | Defaults to `<origin>/auth/callback`. |
+| `VITE_OIDC_SILENT_REDIRECT_URI` | No | Silent renew callback URI. | Defaults to `<origin>/auth/silent-callback`. |
+| `VITE_OIDC_POST_LOGOUT_REDIRECT_URI` | No | Redirect after logout. | Defaults to the current origin. |
+
+## Example `.env`
+
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+VITE_OIDC_AUTHORITY=https://your-oidc-provider.example.com/realms/codecurate
+VITE_OIDC_CLIENT_ID=codecurate-frontend
+VITE_OIDC_SCOPE=openid profile email
+VITE_OIDC_REDIRECT_URI=http://localhost:5173/auth/callback
+VITE_OIDC_SILENT_REDIRECT_URI=http://localhost:5173/auth/silent-callback
+VITE_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:5173
+```
+
+## Installing dependencies
+
+From the frontend repository root:
+
+```bash
+pnpm install
+```
+
+Important behavior:
+
+- `postinstall` tries to generate the OpenAPI client from the hosted spec first
+- if the hosted spec is unavailable, it falls back to the local backend spec
+- generated files live under `src/api`
+
+## Running locally
+
+From the frontend repository root:
+
+```bash
+pnpm dev
+```
+
+Then open the Vite dev URL shown in the terminal, usually `http://localhost:5173`.
+
+## Recommended local stack
+
+1. Start MongoDB and the backend.
+2. Confirm the backend OpenAPI and auth config are valid.
+3. Set the frontend Vite variables so they point at the backend and OIDC provider.
+4. Start the frontend with `pnpm dev`.
+5. Sign in and verify the main routes load.
+
+## When to regenerate the API client
+
+Regenerate `src/api` when:
+
+- the backend OpenAPI contract changed
+- controller request or response shapes changed
+- new endpoint groups or fields were added
+
+Use:
+
+```bash
+pnpm generate:api:local
+```
+
+Do not hand-edit `src/api`; treat it as generated output.
+
+## Useful validation commands
+
+```bash
+pnpm build
+pnpm exec tsc --noEmit
+```
+
+The first validates the production build path. The second validates TypeScript without emitting files.

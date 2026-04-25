@@ -11,18 +11,60 @@ import styles from './index.module.css';
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
+    <header className={clsx(styles.heroBanner)}>
       <div className="container">
-        <Heading as="h1" className="hero__title">
-          {siteConfig.title}
-        </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link
-            className="button button--secondary button--lg"
-            to="/docs/intro">
-            Docusaurus Tutorial - 5min ⏱️
-          </Link>
+        <div className={styles.heroGrid}>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>Documentation for the Codecurate platform</p>
+            <Heading as="h1" className={styles.heroTitle}>
+              {siteConfig.title}
+            </Heading>
+            <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
+            <p className={styles.heroBody}>
+              Both sides of Codecurate are documented now. The backend pages cover
+              setup, authentication, media workflows, FFmpeg automation, compare
+              jobs, and TMDB integration, while the frontend pages describe the
+              React app shell, route map, OIDC flow, API integration, and user-facing workflows.
+            </p>
+            <div className={styles.actions}>
+              <Link className={styles.primaryAction} to="/docs/backend/overview">
+                Read backend docs
+              </Link>
+              <Link className={styles.secondaryAction} to="/docs/frontend/overview">
+                See frontend structure
+              </Link>
+            </div>
+          </div>
+          <div className={styles.heroPanel}>
+            <div className={styles.panelCard}>
+              <span className={styles.panelLabel}>Backend</span>
+              <strong className={styles.panelValue}>Documented</strong>
+              <p className={styles.panelText}>
+                Runtime architecture, operations, endpoint groups, and deployment notes.
+              </p>
+            </div>
+            <div className={styles.panelCard}>
+              <span className={styles.panelLabel}>Frontend</span>
+              <strong className={styles.panelValue}>Documented</strong>
+              <p className={styles.panelText}>
+                Application structure, auth flow, service layer, and workflow guides.
+              </p>
+            </div>
+            <div className={styles.quickStrip}>
+              <div>
+                <span className={styles.quickStripLabel}>Security</span>
+                <strong>JWT + allowed client checks</strong>
+              </div>
+              <div>
+                <span className={styles.quickStripLabel}>Operations</span>
+                <strong>MongoDB, watchers, FFmpeg queue</strong>
+              </div>
+              <div>
+                <span className={styles.quickStripLabel}>Reference</span>
+                <strong>OpenAPI at `/api/docs` and `/api/docs-yaml`</strong>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -33,8 +75,8 @@ export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
+      title={siteConfig.title}
+      description="Codecurate backend documentation with space reserved for future frontend guides.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

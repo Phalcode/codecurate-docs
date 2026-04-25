@@ -1,0 +1,162 @@
+---
+sidebar_position: 5
+title: Workflows
+---
+
+# Workflows
+
+This page maps the main frontend pages to the workflows they support and the backend capabilities they depend on.
+
+## Browse
+
+The browse page is the core operational screen.
+
+### What users can do
+
+- browse indexed media in a dense table
+- search by title or path
+- filter by codec, resolution, bitrate health, format, and language
+- select directories from the folder tree
+- upload media into the current path
+- rename, delete, and download files
+- select up to two files for comparison
+
+### Implementation details worth knowing
+
+- search, filter, and sorting state are mirrored into the URL
+- language labels are normalized for display from ISO language codes
+- compare selections are cached in local storage so the compare page can be prefilled
+- uploads surface separate counts for uploaded, skipped, and failed files
+
+### Backend dependencies
+
+- `GET /api/media`
+- `GET /api/media/insights`
+- `GET /api/media/statistics`
+- `POST /api/media/upload`
+- `POST /api/media/rename`
+- `DELETE /api/media`
+- `POST /api/media/download-ticket`
+- `GET /api/filesystem`
+
+## Commands
+
+The commands page manages FFmpeg presets.
+
+### What users can do
+
+- list all presets
+- create a new preset
+- edit an existing preset
+- enable or disable a preset
+- delete a preset
+- copy an argument template to the clipboard
+
+### Validation mirrored in the UI
+
+- preset name is required
+- argument template must contain `{input}`
+- argument template must contain `{output}`
+
+### Backend dependencies
+
+- `GET /api/commands`
+- `POST /api/commands`
+- `PUT /api/commands/{id}`
+- `DELETE /api/commands/{id}`
+
+## Jobs
+
+The jobs page unifies command jobs and compare/VMAF jobs into one monitoring view.
+
+### What users can do
+
+- inspect queued, running, finished, and failed jobs
+- open process details and logs
+- estimate progress from FFmpeg log output when possible
+- stop jobs
+- delete outputs while stopping when appropriate
+- clear completed jobs
+
+### Notable implementation details
+
+- hidden internal jobs such as post-run VMAF helpers are filtered out of the main list
+- ETA is inferred from FFmpeg `Duration` and `time=` log tokens when those are available
+- VMAF compare jobs are surfaced alongside FFmpeg jobs in a single job model for the UI
+
+### Backend dependencies
+
+- `GET /api/commands/processes`
+- `GET /api/commands/processes/{processId}`
+- `POST /api/commands/processes/{processId}/kill`
+- `DELETE /api/commands/processes/{processId}`
+- `POST /api/commands/processes/clear-completed`
+- `POST /api/compare/vmaf/jobs`
+
+## Compare
+
+The compare page handles both immediate metadata comparison and queued VMAF work.
+
+### What users can do
+
+- compare two file paths by metadata
+- enqueue a VMAF comparison and jump to the jobs page
+- review compare history
+- restore previous compare inputs from history
+- delete history entries
+- clear history in bulk
+
+### State behavior
+
+- paths can come from query parameters
+- if query parameters are absent, the page can preload from the compare selection stored by browse
+- metadata results stay on the page, while VMAF work is intentionally delegated to the jobs flow
+
+### Backend dependencies
+
+- `GET /api/compare`
+- `POST /api/compare/vmaf/jobs`
+- `GET /api/compare/history`
+- `GET /api/compare/history/{historyId}`
+- `DELETE /api/compare/history/{historyId}`
+- `DELETE /api/compare/history`
+
+## Obtain
+
+The obtain page is a queue-management and discovery surface for missing media.
+
+### What users can do
+
+- search TMDB
+- add TMDB results to the obtain list
+- add custom entries manually
+- filter and sort the queue
+- inspect translations for titles and overviews
+- copy title/year strings for use elsewhere
+- remove obtain items
+
+### State and UX details
+
+- preferred translation language is stored locally
+- queue sort preference is stored locally
+- search input is debounced
+- TMDB-backed items and title-only custom items are handled differently in the UI
+
+### Backend dependencies
+
+- `GET /api/obtain`
+- `POST /api/obtain`
+- `DELETE /api/obtain/{id}`
+- `GET /api/obtain/search`
+- `GET /api/obtain/{mediaType}/{tmdbId}/translations`
+- optionally `POST /api/obtain/auto-match` through the service layer when file-based matching is used elsewhere in the app
+
+## Shell-level workflows
+
+Outside the feature pages themselves, the shell also supports:
+
+- login and logout
+- language switching between English and German
+- theme switching
+- folder tree navigation in the sidebar
+- quick movement between browse, obtain, jobs, compare, and commands

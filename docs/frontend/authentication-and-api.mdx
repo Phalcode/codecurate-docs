@@ -1,0 +1,127 @@
+---
+sidebar_position: 4
+title: Authentication and API
+---
+
+# Authentication and API
+
+The frontend authenticates users with OIDC and then uses the resulting bearer token to call the backend API.
+
+## OIDC configuration
+
+The app configures `oidc-client-ts` with:
+
+- `authority` from `VITE_OIDC_AUTHORITY`
+- `client_id` from `VITE_OIDC_CLIENT_ID`, defaulting to `codecurate-frontend`
+- `response_type` fixed to `code`
+- `scope` from `VITE_OIDC_SCOPE`, defaulting to `openid profile email`
+- redirect URIs derived from the browser origin unless explicit variables override them
+- local storage as the browser-side user store
+- automatic silent renew enabled
+
+## Login flow
+
+The protected route guard is `RequireAuth`.
+
+Behavior:
+
+1. wait for `AuthContext` to finish initial session resolution
+2. if a valid non-expired user exists, render the protected app
+3. if no valid user exists, trigger `signinRedirect`
+4. throttle redirects to reduce tight redirect loops during misconfiguration or callback failure
+
+The app stores the intended return path before redirecting so users land back on the page they were trying to reach.
+
+## Callback flow
+
+`/auth/callback` completes the OIDC redirect flow by calling `signinRedirectCallback()`.
+
+On success it:
+
+- clears auth redirect bookkeeping from session storage
+- restores the stored `returnTo` route if present
+- otherwise sends the user to `/`
+
+On failure it:
+
+- records a callback error timestamp to help throttle loops
+- logs the error to the console
+- navigates back to the stored destination or `/`
+
+## Silent renew and token expiry handling
+
+The app enables `automaticSilentRenew` and also handles expiry events in `AuthContext`.
+
+When a token is expiring or expired, the frontend tries to renew silently. If renewal succeeds, the current access token is refreshed in the token store. If it fails, the app does not immediately hard-fail the session; instead, unauthorized API responses trigger the next step in the recovery flow.
+
+## API client structure
+
+Most backend integration goes through the generated OpenAPI client under `src/api`.
+
+The shared `createApiConfiguration()` function sets:
+
+- `basePath` from `VITE_API_BASE_URL` or its default
+- a pre-request middleware that attaches the `Authorization` header when a token exists
+- a post-response middleware that retries one `401` after silent renew
+- an interactive login redirect when renewal cannot recover the session
+
+## Unauthorized retry behavior
+
+When the backend returns `401`:
+
+1. the middleware checks whether the request has already been retried
+2. it attempts silent renew
+3. if a new token is available, it retries the request once
+4. if retry is impossible or still unauthorized, it removes the local user and redirects to login
+
+This is a practical middle layer between passive token expiry handling and a full session reset.
+
+## Custom request paths
+
+Two areas use direct `fetch` helpers instead of generated client methods alone.
+
+### Uploads
+
+`src/services/media.ts` uses `fetch` with `FormData` to send multipart uploads to `/media/upload`.
+
+This helper:
+
+- requires a bearer token
+- attaches `path`, optional `subfolder`, and one or more `files`
+- normalizes the response into `uploaded_files`, `skipped_files`, and `failed_files`
+
+### Downloads
+
+Downloads are a two-step flow:
+
+1. request a ticket from `/media/download-ticket` with bearer auth
+2. construct the anonymous `/media/download` URL with `path` and `ticket`
+
+The frontend then triggers a browser download by creating a temporary anchor element.
+
+## Service-layer responsibilities
+
+The service files are intentionally thin:
+
+- `media.ts`: rename, delete, download, upload, and total count helpers
+- `commands.ts`: preset CRUD, run command, list processes, kill, remove, clear completed
+- `compare.ts`: metadata compare, VMAF jobs, and compare history
+- `obtain.ts`: obtain list CRUD, TMDB search, titles, translations, and file-path helpers
+
+That keeps most pages focused on UI flow while preserving one place to normalize API error messages.
+
+## Backend coupling to keep in mind
+
+The frontend assumes the backend rules already documented in the backend section, especially:
+
+- JWT bearer auth plus allowed-client enforcement
+- secure download ticket flow
+- queue-based command and VMAF execution
+- query and filter behavior for media browsing
+
+Related backend pages:
+
+- [Authentication and access](/docs/backend/authentication-and-access)
+- [Media library](/docs/backend/media-library)
+- [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg)
+- [Compare and obtain](/docs/backend/compare-and-obtain)
