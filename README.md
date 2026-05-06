@@ -1,6 +1,6 @@
-# Website
+# WORK IN PROGRESS
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
+If you are seeing this, it means the project is still work in progress. Please check back later for updates.
 
 ## Installation
 
