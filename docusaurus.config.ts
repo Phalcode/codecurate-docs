@@ -1,39 +1,40 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: 'Codecurate Docs',
-  tagline: 'Backend reference, operations, and future frontend guides for Codecurate',
-  favicon: 'img/favicon.ico',
+  title: "Codecurate Docs",
+  tagline:
+    "Backend reference, operations, and future frontend guides for Codecurate",
+  favicon: "img/logo.svg",
 
   future: {
     v4: true,
   },
 
-  url: 'https://codecurate.example.com',
-  baseUrl: '/',
+  url: "https://codecura.te.it",
+  baseUrl: "/",
 
-  organizationName: 'codecurate',
-  projectName: 'codecurate-docs',
+  organizationName: "Phalcode",
+  projectName: "codecurate-docs",
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: "throw",
 
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: "en",
+    locales: ["en"],
   },
 
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: {
-          sidebarPath: './sidebars.ts',
+          sidebarPath: "./sidebars.ts",
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: "./src/css/custom.css",
         },
       } satisfies Preset.Options,
     ],
@@ -41,82 +42,103 @@ const config: Config = {
 
   themeConfig: {
     colorMode: {
-      defaultMode: 'light',
+      defaultMode: "light",
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Codecurate',
+      title: "Codecurate",
       logo: {
-        alt: 'Codecurate Logo',
-        src: 'img/logo.svg',
+        alt: "Codecurate Logo",
+        src: "img/logo.svg",
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docsSidebar',
-          position: 'left',
-          label: 'Docs',
+          type: "docSidebar",
+          sidebarId: "docsSidebar",
+          position: "left",
+          label: "Docs",
         },
         {
-          to: '/docs/backend/overview',
-          label: 'Backend',
-          position: 'left',
+          to: "/docs/backend/overview",
+          label: "Backend",
+          position: "left",
         },
         {
-          to: '/docs/frontend/overview',
-          label: 'Frontend',
-          position: 'left',
+          to: "/docs/frontend/overview",
+          label: "Frontend",
+          position: "left",
+        },
+        {
+          label: "GitHub",
+          href: "https://github.com/phalcode",
+          position: "right",
+        },
+        {
+          label: "Discord",
+          href: "https://discord.gg/NEdNen2dSu",
+          position: "right",
+        },
+        {
+          label: "Support us",
+          href: "https://gamevau.lt/docs/intro#support",
+          position: "right",
         },
       ],
     },
     footer: {
-      style: 'dark',
+      logo: {
+        src: "img/phalcode-text-light.svg",
+        srcDark: "img/phalcode-text-dark.svg",
+        height: "30vh",
+        href: "https://phalco.de",
+      },
+      style: "dark",
       links: [
         {
-          title: 'Docs',
+          title: "Docs",
           items: [
             {
-              label: 'Introduction',
-              to: '/docs/intro',
+              label: "Introduction",
+              to: "/docs/intro",
             },
             {
-              label: 'Backend Overview',
-              to: '/docs/backend/overview',
+              label: "Backend Overview",
+              to: "/docs/backend/overview",
             },
           ],
         },
         {
-          title: 'Backend',
+          title: "Backend",
           items: [
             {
-              label: 'Getting Started',
-              to: '/docs/backend/getting-started',
+              label: "Getting Started",
+              to: "/docs/backend/getting-started",
             },
             {
-              label: 'Media Library',
-              to: '/docs/backend/media-library',
+              label: "Media Library",
+              to: "/docs/backend/media-library",
             },
             {
-              label: 'Automation and FFmpeg',
-              to: '/docs/backend/automation-and-ffmpeg',
+              label: "Automation and FFmpeg",
+              to: "/docs/backend/automation-and-ffmpeg",
             },
           ],
         },
         {
-          title: 'Frontend',
+          title: "Frontend",
           items: [
             {
-              label: 'Overview',
-              to: '/docs/frontend/overview',
+              label: "Overview",
+              to: "/docs/frontend/overview",
             },
             {
-              label: 'Integration Entry Points',
-              to: '/docs/backend/authentication-and-access',
+              label: "Integration Entry Points",
+              to: "/docs/backend/authentication-and-access",
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Codecurate. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Codecurate - All Rights Reserved.`,
     },
     prism: {
       theme: prismThemes.github,
