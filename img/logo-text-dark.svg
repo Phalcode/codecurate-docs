@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="629.33984"
+   height="184"
+   viewBox="0 0 629.33984 184"
+   fill="none"
+   version="1.1"
+   id="svg25"
+   sodipodi:docname="logo-text-dark.svg"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview27"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     showgrid="false"
+     inkscape:zoom="1.255102"
+     inkscape:cx="413.11383"
+     inkscape:cy="101.187"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-2"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg25" />
+  <defs
+     id="defs7">
+    <linearGradient
+       id="ccWordmarkGradientDark"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         stop-color="#22D3EE"
+         id="stop2" />
+      <stop
+         offset="1"
+         stop-color="#34D399"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#ccWordmarkGradientDark"
+       id="linearGradient256"
+       gradientUnits="userSpaceOnUse"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientTransform="translate(-20,-20)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#ccWordmarkGradientDark"
+       id="linearGradient258"
+       gradientUnits="userSpaceOnUse"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientTransform="translate(-20,-20)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#ccWordmarkGradientDark"
+       id="linearGradient260"
+       gradientUnits="userSpaceOnUse"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientTransform="translate(-20,-20)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#ccWordmarkGradientDark"
+       id="linearGradient262"
+       gradientUnits="userSpaceOnUse"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientTransform="translate(-20,-20)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#ccWordmarkGradientDark"
+       id="linearGradient264"
+       gradientUnits="userSpaceOnUse"
+       x1="40"
+       y1="24"
+       x2="184"
+       y2="200"
+       gradientTransform="translate(-20,-20)" />
+  </defs>
+  <rect
+     x="4"
+     y="4"
+     width="176"
+     height="176"
+     rx="44"
+     fill="#0b1220"
+     id="rect9" />
+  <rect
+     x="4"
+     y="4"
+     width="176"
+     height="176"
+     rx="44"
+     stroke="url(#ccWordmarkGradientDark)"
+     stroke-width="8"
+     id="rect11"
+     style="stroke:url(#linearGradient256)" />
+  <path
+     d="M 126,36 H 92 v 30 h 34 z"
+     fill="url(#ccWordmarkGradientDark)"
+     id="path13"
+     style="fill:url(#linearGradient258)" />
+  <path
+     d="M 56,66 H 92 V 96 H 56 Z"
+     fill="url(#ccWordmarkGradientDark)"
+     id="path15"
+     style="fill:url(#linearGradient260)" />
+  <path
+     d="m 92,96 h 34 v 30 H 92 Z"
+     fill="url(#ccWordmarkGradientDark)"
+     id="path17"
+     style="fill:url(#linearGradient262)" />
+  <path
+     d="m 56,126 h 36 v 30 H 56 Z"
+     fill="url(#ccWordmarkGradientDark)"
+     id="path19"
+     style="fill:url(#linearGradient264)" />
+  <text
+     x="216"
+     y="112"
+     font-family="ui-sans-serif, system-ui, '-apple-system', 'Segoe UI', sans-serif"
+     font-size="82px"
+     font-weight="760"
+     fill="#f8fafc"
+     letter-spacing="1"
+     id="text21"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial"
+       id="tspan404">codecurate</tspan></text>
+  <text
+     x="220"
+     y="154"
+     font-family="ui-sans-serif, system-ui, '-apple-system', 'Segoe UI', sans-serif"
+     font-size="24px"
+     font-weight="500"
+     fill="#a3b2c7"
+     letter-spacing="4"
+     id="text23"
+     style="letter-spacing:2.5px"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial"
+       id="tspan406">MEDIA QUALITY WORKBENCH</tspan></text>
+</svg>
