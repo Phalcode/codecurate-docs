@@ -1,0 +1,322 @@
+---
+sidebar_position: 7
+title: Deployment & Configuration
+---
+
+# Deployment & Configuration
+
+Everything you need to run Codecurate in production — or just on your home server.
+
+## System requirements
+
+| Component | Minimum | Recommended |
+|---|---|---|
+| **Host OS** | Linux with Docker 24+ | Linux with Docker 26+ |
+| **RAM** | 2 GB free (backend + MongoDB) | 4 GB+ free |
+| **Disk** | Enough for MongoDB data (~1 KB per indexed file) | SSD for MongoDB |
+| **GPU** | None (CPU encoding works) | Intel Arc/6th-gen+, AMD with amdgpu, NVIDIA with Container Toolkit |
+| **Network** | — | Reverse proxy with TLS (Caddy, Nginx, Traefik) |
+
+:::warning GPU acceleration is Linux-only
+Docker GPU passthrough (`/dev/dri` for Intel/AMD, `--gpus` for NVIDIA) requires a Linux host. Docker Desktop on Windows and macOS does not support this. CPU encoding works everywhere.
+:::
+
+## Architecture
+
+Codecurate is three containers:
+
+```
+┌──────────────────────────────────────────────┐
+│                  Docker Host                  │
+│                                              │
+│  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
+│  │ MongoDB  │  │ Backend  │  │ Frontend  │  │
+│  │   :27017 │  │   :5000  │  │   :80     │  │
+│  └──────────┘  └────┬─────┘  └───────────┘  │
+│                     │                        │
+│                ┌────▼─────┐                  │
+│                │  Docker   │                  │
+│                │  Socket   │                  │
+│                └────┬─────┘                  │
+│                     │                        │
+│     ┌───────────────▼──────────────────┐     │
+│     │     FFmpeg Worker Containers      │     │
+│     │  (ephemeral, one per job)         │     │
+│     │  - CPU, Intel QSV, AMD, NVIDIA    │     │
+│     └──────────────────────────────────┘     │
+│                                              │
+│  /media ──── mounted read-only ──────────>   │
+│  /dev/dri ── GPU access (optional) ──────>   │
+└──────────────────────────────────────────────┘
+```
+
+- **MongoDB** stores media metadata, command presets, job history, compare history, and obtain list
+- **Backend** handles the API, media indexing, job queue, and worker orchestration
+- **Frontend** is a static React app served by Nginx, talking to the backend API
+- **Worker containers** are ephemeral — the backend creates them per-job and destroys them after
+
+## Docker Compose (production)
+
+```yaml
+services:
+  mongodb:
+    image: mongo:8
+    container_name: codecurate-mongo
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      retries: 5
+
+  backend:
+    image: ghcr.io/phalcode/codecurate-backend:latest
+    container_name: codecurate-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - /path/to/your/media:/media:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - OIDC_AUTHORITY=${OIDC_AUTHORITY}
+      - OIDC_ALLOWED_CLIENTS=${OIDC_ALLOWED_CLIENTS:-codecurate-frontend}
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS}
+      - DB_URL=mongodb:27017
+      - DB_USERNAME=${DB_USERNAME:-codecurate}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - MEDIA_DIR=/media
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - FFMPEG_EXECUTION_MODE=${FFMPEG_EXECUTION_MODE:-local}
+      - FFMPEG_WORKER_PROFILE=${FFMPEG_WORKER_PROFILE:-cpu}
+      - FFMPEG_MAX_PARALLEL_PROCESSES=${FFMPEG_MAX_PARALLEL_PROCESSES:-1}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  frontend:
+    image: ghcr.io/phalcode/codecurate-frontend:latest
+    container_name: codecurate-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+      - VITE_OIDC_AUTHORITY=${VITE_OIDC_AUTHORITY}
+      - VITE_OIDC_CLIENT_ID=${VITE_OIDC_CLIENT_ID:-codecurate-frontend}
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:
+```
+
+Save this as `docker-compose.yml`, create a `.env` file next to it with your values, and run `docker compose up -d`.
+
+### `.env` template
+
+```env
+OIDC_AUTHORITY=https://auth.example.com/realms/codecurate
+OIDC_ALLOWED_CLIENTS=codecurate-frontend
+FRONTEND_ORIGINS=https://codecurate.example.com
+DB_USERNAME=codecurate
+DB_PASSWORD=a-strong-password
+TMDB_API_KEY=your-tmdb-api-key
+VITE_API_BASE_URL=https://codecurate.example.com/api
+VITE_OIDC_AUTHORITY=https://auth.example.com/realms/codecurate
+VITE_OIDC_CLIENT_ID=codecurate-frontend
+FFMPEG_EXECUTION_MODE=docker
+FFMPEG_WORKER_PROFILE=cpu
+FFMPEG_MAX_PARALLEL_PROCESSES=2
+```
+
+## GPU worker profiles
+
+### CPU (default)
+
+No special setup. Works everywhere, but encoding is slower and CPU-intensive.
+
+```env
+FFMPEG_EXECUTION_MODE=docker
+FFMPEG_WORKER_PROFILE=cpu
+```
+
+### Intel QSV
+
+Requires an Intel CPU with integrated graphics (6th gen or newer).
+
+**Additional compose configuration:**
+
+```yaml
+backend:
+  volumes:
+    - /dev/dri:/dev/dri
+  environment:
+    - FFMPEG_EXECUTION_MODE=docker
+    - FFMPEG_WORKER_PROFILE=intel
+```
+
+If your worker image needs supplementary groups for DRI access:
+
+```env
+FFMPEG_WORKER_DRI_GROUPS=video,render
+```
+
+**Recommended encoder arguments:**
+
+| Codec | FFmpeg encoder |
+|---|---|
+| H.264 | `h264_qsv` |
+| H.265 / HEVC | `hevc_qsv` |
+| AV1 | `av1_qsv` (Arc/11th gen+ only) |
+| VP9 | `vp9_qsv` |
+
+### AMD AMF
+
+Requires an AMD GPU with the `amdgpu` kernel driver.
+
+```yaml
+backend:
+  volumes:
+    - /dev/dri:/dev/dri
+  environment:
+    - FFMPEG_EXECUTION_MODE=docker
+    - FFMPEG_WORKER_PROFILE=amd
+```
+
+### NVIDIA NVENC
+
+Requires an NVIDIA GPU and the NVIDIA Container Toolkit installed on the host.
+
+```yaml
+backend:
+  environment:
+    - FFMPEG_EXECUTION_MODE=docker
+    - FFMPEG_WORKER_PROFILE=nvidia
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+```
+
+Verify the toolkit is installed:
+
+```bash
+nvidia-ctk --version
+```
+
+## Network & reverse proxy
+
+The backend listens on port `5000`, the frontend on port `80` (inside its container). In production, put both behind a reverse proxy like Nginx, Caddy, or Traefik.
+
+### Example: Caddy
+
+```
+codecurate.example.com {
+    handle /api/* {
+        reverse_proxy backend:5000
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+```
+
+### Example: Nginx
+
+```nginx
+server {
+    server_name codecurate.example.com;
+
+    location /api/ {
+        proxy_pass http://backend:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+## Volume mounts
+
+The media directory must be mounted into the backend container. Place it anywhere on the host and set `MEDIA_DIR` to the internal mount path.
+
+```yaml
+volumes:
+  - /mnt/nas/media:/media:ro
+```
+
+The `:ro` flag mounts it read-only. This is recommended — FFmpeg workers only need read access to the source file. The output goes next to the source, so the volume must be writable from the worker containers as well.
+
+**Important:** the host path must be identical for both the backend container and the worker containers it spawns. The backend reads its own bind mounts via `docker inspect` and passes them to workers. This means you should use absolute host paths, not named volumes, for your media.
+
+## MongoDB persistence
+
+The `mongodb_data` volume stores everything — media metadata, presets, job history, compare results, obtain list. Back it up.
+
+Quick backup:
+
+```bash
+docker exec codecurate-mongo mongodump --archive > backup.archive
+```
+
+Quick restore:
+
+```bash
+docker exec -i codecurate-mongo mongorestore --archive < backup.archive
+```
+
+## Building from source
+
+If you prefer to build the images yourself instead of pulling from the registry:
+
+### Backend
+
+```bash
+git clone https://github.com/Phalcode/codecurate-backend
+cd codecurate-backend
+docker build -t codecurate-backend .
+```
+
+### Frontend
+
+```bash
+git clone https://github.com/Phalcode/codecurate-frontend
+cd codecurate-frontend
+docker build -t codecurate-frontend .
+```
+
+Then replace the image references in `docker-compose.yml` with your local tags.
+
+## Troubleshooting
+
+### Backend can't connect to MongoDB
+
+Make sure the MongoDB container is healthy before the backend starts. The compose file above uses a `depends_on` with a healthcheck condition.
+
+### "No media files found"
+
+- Verify `MEDIA_DIR` matches the internal mount path in the container
+- Check file permissions — the backend container needs read access
+- Look at the backend logs — `MediaAnalysisService` logs indexing progress
+
+### FFmpeg jobs stay queued forever
+
+- Check `FFMPEG_MAX_PARALLEL_PROCESSES` isn't 0
+- Verify the Docker socket is mounted: `/var/run/docker.sock:/var/run/docker.sock`
+- For GPU workers, ensure `/dev/dri` is mounted (Intel/AMD) or the NVIDIA toolkit is installed
+- Check backend logs for worker creation errors
+
+### OIDC login fails
+
+- Ensure your OIDC provider uses HTTPS (the backend enforces this)
+- Verify the redirect URIs in your OIDC provider exactly match your frontend URL
+- Check that `OIDC_ALLOWED_CLIENTS` includes your client ID

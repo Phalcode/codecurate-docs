@@ -1,59 +1,106 @@
 ---
 sidebar_position: 1
-title: Codecurate Documentation
+title: Codecurate
+slug: /
 ---
 
-# Codecurate Documentation
+# Codecurate
 
-This site is organized so backend and frontend documentation can grow independently without having to reshuffle the navigation later.
+**Know your media library. Transform it. Keep it clean.**
 
-Both the backend and frontend sections are now documented from the current codebases. The split is still intentional: backend pages remain the source of truth for API and operational behavior, while frontend pages focus on application structure, auth flow, API integration, and user workflows.
+You have thousands of video files on your server. Different codecs, resolutions, bitrates, languages, formats — spread across drives and folders. Maybe you ripped them yourself, maybe they accumulated over years. Either way, you have no real overview. Plex and Jellyfin show you a pretty library, but they won't tell you that 40% of your collection is still H.264, or that half your audio tracks are AC3 when you wanted Opus.
 
-## Documentation map
+Codecurate fixes that.
 
-- [Backend overview](/docs/backend/overview) explains the runtime architecture, storage model, and major services.
-- [Getting started](/docs/backend/getting-started) covers prerequisites, configuration, local development, and Docker notes.
-- [Authentication and access](/docs/backend/authentication-and-access) explains JWT requirements, client restrictions, CORS, and secure downloads.
-- [Media library](/docs/backend/media-library) documents indexing, querying, uploads, renames, deletes, and filter syntax.
-- [Automation and FFmpeg](/docs/backend/automation-and-ffmpeg) covers command presets, job lifecycle, worker modes, and queue behavior.
-- [Compare and obtain](/docs/backend/compare-and-obtain) documents metadata compare, VMAF workflows, history, and TMDB-backed obtain flows.
-- [API reference](/docs/backend/api-reference) is the endpoint-by-endpoint quick lookup.
-- [Frontend overview](/docs/frontend/overview) explains the React application shell, route map, and major feature areas.
-- [Frontend getting started](/docs/frontend/getting-started) covers prerequisites, scripts, environment variables, and OpenAPI generation.
-- [Frontend authentication and API](/docs/frontend/authentication-and-api) documents OIDC, silent renew, unauthorized retry behavior, and generated client usage.
-- [Frontend workflows](/docs/frontend/workflows) maps the main pages to backend capabilities and user flows.
+It scans every media file on your server, pulls metadata with `ffprobe`, and gives you a single, filterable, searchable view of *everything*. A massive list you can slice and dice however you want. Then it lets you run arbitrary FFmpeg commands — in bulk, queued, with GPU acceleration — to actually do something about what you find.
 
-## Start here
+---
 
-If you are deploying or developing the backend first, read these pages in order:
+## What you get
 
-1. [Backend overview](/docs/backend/overview)
-2. [Getting started](/docs/backend/getting-started)
-3. [Authentication and access](/docs/backend/authentication-and-access)
-4. [Media library](/docs/backend/media-library)
+###  A library overview that actually tells you something
 
-If you are integrating a client application, the fastest path is:
+Not just a file list. Codecurate shows you distributions across your entire collection:
 
-1. [Authentication and access](/docs/backend/authentication-and-access)
-2. [API reference](/docs/backend/api-reference)
-3. [Compare and obtain](/docs/backend/compare-and-obtain)
+- **Video codecs** — How much is AV1? H.264? H.265? VP9?
+- **Audio codecs** — Opus, AAC, AC3, FLAC, DTS?
+- **Resolutions** — 4K, 1080p, 720p, SD?
+- **Bitrate health** — Is that encode actually good or is it bitrate-starved?
+- **Languages** — What audio and subtitle languages do you have?
+- **Formats** — MKV, MP4, AVI, wtf-is-this?
 
-## Current backend scope
+Filter by any combination. See counts and percentages update in real time. Click a filter, the table narrows down. Finally, you *know* what's on your server.
 
-- ASP.NET Core API hosted on port `5000`
-- MongoDB-backed metadata, queue, compare, and obtain storage
-- Background media indexing with file watching and periodic reconciliation
-- FFmpeg command preset execution with local and Docker worker modes
-- Metadata compare and queued VMAF calculation workflows
-- TMDB-backed search, translations, titles, and obtain-list automation
+###  A massive, fast media table
 
-## Notes for future frontend docs
+The browse view handles tens of thousands of entries without breaking a sweat. Virtual scrolling, sortable columns, batch selection. Select a whole season of a show and queue up a conversion on all of them with two clicks.
 
-The frontend section is now documented at a high level and already has room for deeper additions such as:
+###  FFmpeg Command Presets — your recipes
 
-- application architecture and page map
-- authentication flow and token handling
-- API client usage against the backend documented here
-- media, compare, command, and obtain user workflows
+Define presets for anything FFmpeg can do:
 
-When frontend docs are added, the backend pages can remain stable and keep acting as the source of truth for the API and operational behavior.
+```
+-hide_banner -y -i {input} -c:v av1_qsv -b:v 3M -c:a libopus -b:a 128k {output}
+```
+
+That's an AV1 video encode with Opus audio on an Intel GPU. Save it as a preset. Now you can run it on one file, ten files, or your entire library.
+
+Presets support:
+- `{input}` and `{output}` placeholders — the backend resolves paths for you
+- Custom output suffixes and extensions
+- Optional post-run VMAF quality checks
+- Conditional source file deletion (only delete the original if VMAF score ≥ 90)
+
+###  Job queue with GPU workers
+
+When you run a preset, it goes into a queue. The backend pulls jobs one by one (or more, if your GPU can handle it) and spins up isolated Docker containers with FFmpeg. Each job gets its own container — no pollution, no dependency hell.
+
+Supported worker profiles:
+- **CPU** — software encoding, works everywhere
+- **Intel QSV** — Quick Sync Video on Intel iGPUs
+- **AMD AMF** — AMD GPU encoding via `/dev/dri`
+- **NVIDIA NVENC** — NVIDIA GPU encoding with `--gpus`
+
+Jobs survive backend restarts. Logs are persisted. You can kill a running job or clear finished ones. Everything is visible in the jobs dashboard.
+
+###  Compare files before and after
+
+Ran a conversion? Want to know if you actually improved anything? Codecurate can compare two files:
+
+- **Metadata compare** — side-by-side ffprobe output. Same resolution? Same codec? Same bitrate? See every difference at a glance.
+- **VMAF compare** (advanced) — queue a VMAF quality analysis. Get an objective score (0–100) of how visually similar the output is to the source.
+
+###  Obtain list — your media wishlist
+
+Keep track of what you still want to add to your library. Powered by TMDB:
+
+- Search TMDB for movies and shows directly from the UI
+- Auto-match from a filename you already have in mind
+- Add manual entries with custom titles, years, and notes
+- Browse alternate titles and translations from TMDB
+
+Think of it as a shopping list for your Plex/Jellyfin library.
+
+###  Self-hosted, Docker all the way
+
+Codecurate runs in Docker. Backend, frontend, MongoDB — everything in containers. FFmpeg workers are ephemeral containers that spin up and tear down automatically. One `docker compose up` and you're running.
+
+---
+
+##  Before you start
+
+**Codecurate is built for people who own their media.** You should only use it with video and audio files you have legally acquired. Ripping your own Blu-rays? Great. Managing a collection of legally purchased digital media? Perfect. Anything else? That's on you — Codecurate doesn't judge, but we also don't help with it.
+
+**Codecurate assumes you know what you're doing with FFmpeg.** The command presets let you run *any* FFmpeg arguments. There is no hand-holding. If you don't know what `-c:v av1_qsv -b:v 3M` means, spend some time with the [FFmpeg documentation](https://ffmpeg.org/documentation.html) first. Wrong arguments can produce broken files, and Codecurate won't stop you.
+
+---
+
+##  Ready?
+
+Head over to **[Getting Started](/docs/getting-started)** to spin up your own instance.
+
+Curious about the code? Everything is open source on GitHub:
+
+- [Backend](https://github.com/Phalcode/codecurate-backend) — ASP.NET Core, MongoDB, FFmpeg orchestration
+- [Frontend](https://github.com/Phalcode/codecurate-frontend) — React, Vite, Tailwind
+- [Documentation](https://github.com/Phalcode/codecurate-docs) — this site

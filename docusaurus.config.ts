@@ -3,9 +3,9 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: "Codecurate Docs",
+  title: "Codecurate",
   tagline:
-    "Backend reference, operations, and future frontend guides for Codecurate",
+    "Know your media library. Transform it. Keep it clean.",
   favicon: "img/logo.svg",
 
   future: {
@@ -59,16 +59,6 @@ const config: Config = {
           label: "Docs",
         },
         {
-          to: "/docs/backend/overview",
-          label: "Backend",
-          position: "left",
-        },
-        {
-          to: "/docs/frontend/overview",
-          label: "Frontend",
-          position: "left",
-        },
-        {
           label: "GitHub",
           href: "https://github.com/phalcode",
           position: "right",
@@ -76,11 +66,6 @@ const config: Config = {
         {
           label: "Discord",
           href: "https://discord.gg/NEdNen2dSu",
-          position: "right",
-        },
-        {
-          label: "Support us",
-          href: "https://gamevau.lt/docs/intro#support",
           position: "right",
         },
       ],

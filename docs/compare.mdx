@@ -1,0 +1,90 @@
+---
+sidebar_position: 5
+title: Compare
+---
+
+# Compare
+
+The Compare page lets you put two media files side by side and see exactly how they differ. Useful after running a conversion — did that AV1 encode actually preserve the quality?
+
+## Metadata compare
+
+A metadata compare pulls ffprobe data for both files from MongoDB and displays every property side by side.
+
+### Starting a comparison
+
+From the Browse page, select two files and click "Compare selected." You land on the Compare page with both paths pre-filled. You can also paste paths directly into the input fields.
+
+Click **Compare Metadata** and Codecurate returns a table where each row shows:
+
+| Column | Example |
+|---|---|
+| **Property** | `video_codec`, `bitrate`, `duration`, `resolution`, `audio_channels` |
+| **Left value** | `H.264` |
+| **Right value** | `AV1` |
+| **Match** |   or   |
+
+Properties that differ are highlighted. Every comparison is saved to compare history so you can revisit it later.
+
+### Property categories
+
+The comparison covers:
+
+- **Container** — format, file size, duration
+- **Video streams** — codec, resolution, bitrate, framerate, pixel format, HDR metadata
+- **Audio streams** — codec, channels, sample rate, bitrate, language
+- **Subtitle streams** — codec, language, forced/default flags
+
+## VMAF compare (advanced)
+
+VMAF (Video Multi-Method Assessment Fusion) is an objective video quality metric developed by Netflix. It compares a distorted video against a reference and returns a score from 0 to 100, where 100 means perceptually identical.
+
+Codecurate queues VMAF jobs the same way it queues FFmpeg jobs. You provide a left (reference) and right (distorted) path, and the backend does the rest.
+
+### Starting a VMAF comparison
+
+From the Compare page, with both paths filled, click **Queue VMAF Job**. The job appears in the Jobs dashboard alongside your FFmpeg jobs.
+
+### How it works
+
+The backend currently analyzes a 120-second window rather than the entire file. This keeps VMAF jobs reasonably fast while still giving a representative score.
+
+### Interpreting VMAF scores
+
+| Score range | What it means |
+|---|---|
+| 93–100 | Visually lossless — no perceptible difference |
+| 80–93 | Good quality — minor differences, hard to spot |
+| 60–80 | Acceptable — visible degradation on close inspection |
+| 40–60 | Poor — noticeable quality loss |
+| Below 40 | Bad — don't use this encode |
+
+### Automated VMAF in presets
+
+You don't have to queue VMAF manually. When creating a command preset, enable **Check VMAF after run**. The backend automatically queues a VMAF job after every conversion that uses that preset. Combined with the deletion threshold, you get a fully automated quality-gated conversion pipeline.
+
+## Compare history
+
+Every comparison — metadata or VMAF — is stored in compare history. The Compare page shows your recent history so you can jump back to previous results.
+
+| Action | What it does |
+|---|---|
+| Click a history entry | Loads the full comparison result |
+| Delete an entry | Removes it from history (except running/queued jobs) |
+| Clear all history | Bulk-remove every entry |
+
+## API endpoints
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/compare?left_path=&right_path=` | Run a metadata compare |
+| `GET /api/compare/history` | List compare history |
+| `GET /api/compare/history/{id}` | Get one history entry |
+| `DELETE /api/compare/history/{id}` | Delete one entry |
+| `DELETE /api/compare/history` | Bulk-clear history |
+| `POST /api/compare/vmaf/jobs` | Queue a VMAF job |
+
+:::tip See also
+- **[Commands & Jobs](/docs/commands-jobs)** — post-run VMAF automation in command presets
+- **[Media Library](/docs/media-library)** — select files for comparison from the browse table
+:::

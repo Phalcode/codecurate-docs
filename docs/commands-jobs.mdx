@@ -1,0 +1,156 @@
+---
+sidebar_position: 4
+title: Commands & Jobs
+---
+
+# Commands & Jobs
+
+This is where Codecurate goes from "nice overview" to "actually does work." You define FFmpeg presets, then run them on any file in your library. The backend queues the work, spins up workers, and tracks everything.
+
+## Command Presets
+
+A preset is a saved FFmpeg command template. You create it once, then apply it to one file or a thousand.
+
+### Anatomy of a preset
+
+| Field | What it is |
+|---|---|
+| **Name** | Human-readable label (e.g. "AV1 1080p Opus") |
+| **Description** | Optional note shown in the UI |
+| **Argument template** | The FFmpeg command, with `{input}` and `{output}` as placeholders |
+| **Output suffix** | Added before the file extension (e.g. `.converted`) |
+| **Output extension** | Target container format (e.g. `.mkv`) |
+| **Enabled** | Toggle to allow or prevent execution |
+| **Check VMAF after run** | If on, the backend runs a VMAF comparison after the job completes |
+| **Delete source after run** | If on, the original file is deleted after successful conversion |
+| **VMAF threshold for delete** | If set (0–100), source is only deleted when VMAF score exceeds this value |
+
+### Creating a preset
+
+From the Commands page, click "Create Preset" and fill in the fields. The argument template must contain both `{input}` and `{output}` — the backend substitutes real paths when you run the preset.
+
+Example: Convert video to AV1 with Opus audio on an Intel GPU, keep original audio layout:
+
+```
+-hide_banner -y -i {input} -c:v av1_qsv -b:v 3M -c:a libopus -b:a 128k -map 0 {output}
+```
+
+Example: Remux to MKV without re-encoding (fast, lossless):
+
+```
+-hide_banner -y -i {input} -c copy {output}
+```
+
+Example: Extract and convert all audio to Opus, copy video stream:
+
+```
+-hide_banner -y -i {input} -c:v copy -c:a libopus -b:a 128k {output}
+```
+
+### Managing presets
+
+- **Edit** — change any field of an existing preset
+- **Enable/Disable** — a disabled preset can't be run, but stays in your list
+- **Delete** — remove a preset permanently
+- **Copy template** — one-click copy of the argument template to your clipboard
+
+## Running jobs
+
+### From the browse page
+
+Select one or more files, open the context menu, pick a preset. Each selected file becomes a separate job in the queue.
+
+### From the API
+
+`POST /api/commands/{presetId}/run` with a JSON body:
+
+```json
+{
+  "input_path": "/media/Movies/Some Movie (2024).mkv"
+}
+```
+
+The backend:
+
+1. Validates the preset is enabled and the file exists
+2. Resolves `{input}` and `{output}` from the template
+3. Checks that input ≠ output (no in-place conversion)
+4. Reserves both paths to prevent conflicting jobs
+5. Enqueues the job
+
+Response is `202 Accepted` with the job's `process_id`.
+
+## The job queue
+
+### Queue behavior
+
+- **FIFO** — jobs execute in the order they were submitted. No priorities, no reordering.
+- **Concurrency** — controlled by `FFMPEG_MAX_PARALLEL_PROCESSES`. Set to `4` if your GPU has the headroom.
+- **Persistence** — jobs live in MongoDB. Restart the backend and queued jobs pick up where they left off.
+- **File reservations** — no two jobs can target the same input or output path simultaneously.
+
+### Worker execution
+
+With `FFMPEG_EXECUTION_MODE=docker`, each job gets its own ephemeral Docker container:
+
+1. Backend pulls from the queue
+2. Spins up a container from `FFMPEG_WORKER_IMAGE` with the configured GPU profile
+3. Mounts the media directory (read-only for input)
+4. Creates an output directory next to the source file
+5. Runs the rendered FFmpeg command
+6. Captures stdout and stderr
+7. Tears down the container
+
+With `FFMPEG_EXECUTION_MODE=local`, FFmpeg runs directly on the host. No container isolation, but simpler setup.
+
+### Post-run automation
+
+When a job completes, the backend can optionally:
+
+1. **Run VMAF** — if `check_vmaf_score_after_running` is on, a separate VMAF comparison job is queued. The VMAF score appears in the job details.
+2. **Delete source** — if `delete_input_file_after_running` is on, the original file is removed. If a VMAF threshold is also set, deletion only happens when the score beats that threshold.
+
+This lets you set up workflows like: "Convert to AV1, check quality, only delete the original if VMAF ≥ 95."
+
+## The jobs dashboard
+
+The Jobs page shows all FFmpeg and VMAF jobs in one unified list:
+
+| Column | What you see |
+|---|---|
+| **Title** | Job description with source file name |
+| **Kind** | `command` (ffmpeg) or `vmaf` |
+| **Status** | `queued`, `running`, `finished`, or `failed` |
+| **Duration** | Wall-clock time from start to finish |
+| **Exit code** | FFmpeg exit code (0 = success) |
+| **Post-run** | VMAF score, deletion status, or error message |
+
+Click a job row to expand its detail panel, which shows full stdout and stderr logs.
+
+### Job actions
+
+- **Kill** — stop a running job or cancel a queued one. Optionally delete the partial output file.
+- **Remove** — delete a finished job record from the list. Running or queued jobs can't be removed.
+- **Clear completed** — bulk-remove all finished and failed entries.
+- **Queue VMAF** — manually queue a VMAF comparison between any two files (useful even without a prior conversion job).
+
+## API endpoints
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/commands` | List all presets |
+| `POST /api/commands` | Create a preset |
+| `PUT /api/commands/{id}` | Update a preset |
+| `DELETE /api/commands/{id}` | Delete a preset |
+| `POST /api/commands/{id}/run` | Run a preset on a file |
+| `GET /api/commands/processes` | List all jobs |
+| `GET /api/commands/processes/{id}` | Get one job with logs |
+| `POST /api/commands/processes/{id}/kill` | Kill a job |
+| `DELETE /api/commands/processes/{id}` | Remove a finished job |
+| `POST /api/commands/processes/clear-completed` | Bulk-remove finished jobs |
+
+:::tip See also
+- **[Media Library](/docs/media-library)** — browse and filter your files before running presets on them
+- **[Compare](/docs/compare)** — VMAF quality checks integrate directly with the post-run automation described here
+- **[API Reference](/docs/api-reference)** — full endpoint documentation with request body schemas
+:::

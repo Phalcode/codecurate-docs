@@ -1,0 +1,283 @@
+---
+sidebar_position: 2
+title: Getting Started
+---
+
+# Getting Started
+
+Spin up your own Codecurate instance in about 10 minutes.
+
+## What you'll need
+
+- **Docker** and Docker Compose on a Linux server. GPU acceleration requires a Linux host — Docker Desktop on Windows/macOS does not support GPU passthrough to containers.
+- **An OIDC provider** — Keycloak, Authentik, Authelia, or any service that speaks OpenID Connect. Codecurate does not ship its own authentication. See the OIDC primer below if this is new to you.
+- **Media files** — a directory with video files you want to index and manage. Codecurate uses `ffprobe` for scanning, so any format ffprobe understands (MKV, MP4, AVI, TS, WebM, MOV, and more) is supported.
+- **A TMDB API key** (optional) — only needed for the obtain list's search and auto-match features. Register at [themoviedb.org](https://www.themoviedb.org/signup) and request an API key from your account settings.
+
+You don't need .NET, Node.js, or FFmpeg installed on the host. Everything runs in containers, including MongoDB.
+
+## Quick start with Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  mongodb:
+    image: mongo:8
+    container_name: codecurate-mongo
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+
+  backend:
+    image: ghcr.io/phalcode/codecurate-backend:latest
+    container_name: codecurate-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - /path/to/your/media:/media
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - OIDC_AUTHORITY=https://auth.example.com/realms/codecurate
+      - OIDC_ALLOWED_CLIENTS=codecurate-frontend
+      - FRONTEND_ORIGINS=https://codecurate.example.com
+      - DB_URL=mongodb:27017
+      - DB_USERNAME=codecurate
+      - DB_PASSWORD=change-me
+      - MEDIA_DIR=/media
+      - TMDB_API_KEY=your-tmdb-api-key
+      - FFMPEG_EXECUTION_MODE=docker
+      - FFMPEG_WORKER_PROFILE=cpu
+      - FFMPEG_MAX_PARALLEL_PROCESSES=2
+    depends_on:
+      - mongodb
+
+  frontend:
+    image: ghcr.io/phalcode/codecurate-frontend:latest
+    container_name: codecurate-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_BASE_URL=https://codecurate.example.com/api
+      - VITE_OIDC_AUTHORITY=https://auth.example.com/realms/codecurate
+      - VITE_OIDC_CLIENT_ID=codecurate-frontend
+
+volumes:
+  mongodb_data:
+```
+
+```bash
+docker compose up -d
+```
+
+After startup:
+
+- The backend API is at `http://your-server:5000`
+- The frontend is at `http://your-server:5173`
+- Swagger UI is at `http://your-server:5000/api/docs`
+
+### What happens on first launch
+
+1. Open the frontend URL in your browser. You'll be redirected to your OIDC provider to sign in.
+2. After signing in, you land on the **Browse** page. If your media directory has files, the backend is already scanning them — you'll see entries populating the table within seconds to minutes, depending on library size.
+3. Check the sidebar file count — when it stops climbing, the initial scan is complete.
+4. Head to the **Commands** page and create a simple test preset (e.g. `-hide_banner -y -i {input} -c copy {output}` with `.mkv` extension).
+5. From the Browse page, right-click a file, pick your preset, and run it. Watch the job appear under **Jobs**.
+6. If the job completes successfully, you're all set.
+
+:::tip First preset for testing
+Use a no-op preset for your first run to verify the pipeline end to end:
+
+**Name:** Test Copy
+**Argument template:** `-hide_banner -y -i {input} -c copy {output}`
+**Output suffix:** `.test`
+**Output extension:** `.mkv`
+
+This re-muxes (not re-encodes) the file, so it's fast and non-destructive.
+:::
+
+## Understanding OIDC
+
+Codecurate does not manage users or passwords. It relies on an external **OpenID Connect** provider to handle authentication. If you already run services like Home Assistant, Nextcloud, or Grafana with SSO, you likely have one set up.
+
+### What you need from your provider
+
+1. An **issuer URL** (OIDC Authority) — typically `https://your-provider.example.com/realms/your-realm`
+2. A **client** configured with ID `codecurate-frontend` (or your chosen name)
+3. **Redirect URIs** for the frontend:
+   - `https://your-codecurate-domain.com/auth/callback`
+   - `https://your-codecurate-domain.com/auth/silent-callback`
+4. At least one user account
+
+### Quick Keycloak setup (Docker)
+
+If you don't have an OIDC provider yet, here's the fastest way to get one running:
+
+```yaml
+# Add to your docker-compose.yml
+  keycloak:
+    image: quay.io/keycloak/keycloak:26
+    container_name: codecurate-keycloak
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+    command: start-dev
+```
+
+1. Open `http://your-server:8080` and sign in with `admin` / `admin`.
+2. Create a new realm called `codecurate`.
+3. Under **Clients**, create a client with ID `codecurate-frontend`, set to **Confidential**, with **Standard Flow** and **Direct Access Grants** enabled.
+4. Under the client's **Settings**, set:
+   - **Valid redirect URIs:** `http://localhost:5173/auth/callback`, `http://localhost:5173/auth/silent-callback` (adjust for your domain)
+   - **Valid post logout redirect URIs:** `http://localhost:5173`
+5. Under **Users**, create a user and set a password under the **Credentials** tab.
+6. Use `http://your-server:8080/realms/codecurate` as your `OIDC_AUTHORITY`.
+
+:::warning Production note
+The `start-dev` command above is for testing only — it uses HTTP, an ephemeral H2 database, and default admin credentials. For production, set up Keycloak with a proper database, TLS, and strong passwords.
+:::
+
+## Environment variables reference
+
+### Backend
+
+#### Core
+
+| Variable | Required | What it does | Default |
+|---|---|---|---|
+| `OIDC_AUTHORITY` | Yes | OIDC issuer URL for JWT validation. Must be HTTPS. | — |
+| `OIDC_ALLOWED_CLIENTS` | No | Comma-separated allowed token client IDs. Checked against `azp` and `client_id` claims. | `codecurate-frontend` |
+| `FRONTEND_ORIGINS` | No | CORS-allowed origins, comma-separated. | `http://localhost:5173,https://localhost:5173` |
+| `MEDIA_DIR` | Yes | Root directory scanned for media files. | — |
+| `MEDIA_UPLOAD_MAX_BYTES` | No | Max upload request body size. | `53687091200` (50 GB) |
+| `MEDIA_RESCAN_INTERVAL_MINUTES` | No | How often the backend reconciles the DB with the filesystem. | `10` |
+
+#### MongoDB
+
+| Variable | Required | What it does | Default |
+|---|---|---|---|
+| `DB_URL` | Yes | MongoDB host or connection target. | — |
+| `DB_USERNAME` | Outside DEBUG | MongoDB username. | — |
+| `DB_PASSWORD` | Outside DEBUG | MongoDB password. | — |
+
+In `DEBUG` builds, the backend connects to `mongodb://{DB_URL}` without credentials.
+
+#### TMDB
+
+| Variable | Required | What it does |
+|---|---|---|
+| `TMDB_API_KEY` | For obtain features | Enables TMDB search, title lookup, translations, and auto-match. |
+
+#### FFmpeg workers
+
+| Variable | Required | What it does | Default |
+|---|---|---|---|
+| `FFMPEG_EXECUTION_MODE` | No | `local` or `docker`. Docker mode spawns per-job worker containers. | `local` |
+| `FFMPEG_WORKER_PROFILE` | No | `cpu`, `intel`, `amd`, or `nvidia`. Controls GPU passthrough to workers. | `cpu` |
+| `FFMPEG_MAX_PARALLEL_PROCESSES` | No | Max concurrent FFmpeg jobs. | `1` |
+| `FFMPEG_WORKER_IMAGE` | No | Docker image for worker containers. | `linuxserver/ffmpeg` |
+| `FFMPEG_WORKER_INCLUDE_FFMPEG_BINARY` | No | Prepend `ffmpeg` in worker commands. | `false` |
+| `FFMPEG_WORKER_DRI_GROUPS` | No | Extra groups for Intel/AMD workers (e.g. `video,render`). | — |
+| `FFMPEG_WORKER_NVIDIA_VISIBLE_DEVICES` | No | NVIDIA devices visible to workers. | `all` |
+| `FFMPEG_WORKER_NVIDIA_DRIVER_CAPABILITIES` | No | NVIDIA driver capabilities. | `video,compute,utility` |
+| `FFMPEG_WORKER_PASS_DRI` | No | Legacy compat flag for `/dev/dri` passthrough. | — |
+| `DOCKER_HOST_SOCKET` | No | Path to Docker socket inside backend container. | `/var/run/docker.sock` |
+
+### Frontend
+
+| Variable | Required | What it does | Default |
+|---|---|---|---|
+| `VITE_API_BASE_URL` | No | Backend API base URL including `/api`. | `https://codecurate-backend.alfagun74.de/api` |
+| `VITE_OIDC_AUTHORITY` | Yes | OIDC authority URL. | — |
+| `VITE_OIDC_CLIENT_ID` | No | OIDC client ID. | `codecurate-frontend` |
+| `VITE_OIDC_SCOPE` | No | Requested scopes. | `openid profile email` |
+| `VITE_OIDC_REDIRECT_URI` | No | Sign-in callback URI. | `<origin>/auth/callback` |
+| `VITE_OIDC_SILENT_REDIRECT_URI` | No | Silent renew callback URI. | `<origin>/auth/silent-callback` |
+| `VITE_OIDC_POST_LOGOUT_REDIRECT_URI` | No | Post-logout redirect. | Current origin |
+
+## Setting up your OIDC provider
+
+Codecurate does not ship its own auth — you bring your own OIDC provider. Any provider that speaks standard OpenID Connect works.
+
+### Keycloak example
+
+1. Create a new realm (or use an existing one).
+2. Create a confidential client with ID `codecurate-frontend`.
+3. Set valid redirect URIs:
+   - `https://your-codecurate-domain.com/auth/callback`
+   - `https://your-codecurate-domain.com/auth/silent-callback`
+4. Set post-logout redirect URI to your frontend origin.
+5. Note the realm's issuer URL — that's your `OIDC_AUTHORITY`.
+6. Create at least one user in the realm.
+
+### Authentik example
+
+1. Create a Provider of type OAuth2/OpenID.
+2. Set the client ID to `codecurate-frontend`.
+3. Add redirect URIs for `/auth/callback` and `/auth/silent-callback`.
+4. Create an Application that uses this provider.
+5. Use the provider's OpenID configuration URL as `OIDC_AUTHORITY`.
+
+## GPU acceleration
+
+To use hardware-accelerated encoding, switch to Docker worker mode and pick a GPU profile.
+
+### Intel QSV
+
+```yaml
+backend:
+  environment:
+    - FFMPEG_EXECUTION_MODE=docker
+    - FFMPEG_WORKER_PROFILE=intel
+  volumes:
+    - /dev/dri:/dev/dri
+```
+
+Example preset argument for Intel AV1 encoding:
+
+```
+-hide_banner -y -i {input} -c:v av1_qsv -b:v 3M -c:a copy {output}
+```
+
+### NVIDIA NVENC
+
+```yaml
+backend:
+  environment:
+    - FFMPEG_EXECUTION_MODE=docker
+    - FFMPEG_WORKER_PROFILE=nvidia
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+```
+
+### AMD AMF
+
+Requires an AMD GPU with the `amdgpu` kernel driver. Full setup instructions are on the **[Deployment](/docs/deployment#gpu-worker-profiles)** page.
+
+## Verifying it works
+
+1. Open the frontend in your browser.
+2. Sign in with your OIDC credentials.
+3. You should land on the Browse page. If your media directory has files, you'll see them populating the table.
+4. Check the sidebar — the file count should match what you expect.
+5. Head to the Commands page and create a simple preset (e.g. `-hide_banner -i {input} -c copy {output}` with `.mkv` extension).
+6. Run it on one file from the Browse page and watch the job appear under Jobs.
+
+If the job completes successfully, you're all set.
+
+## Next steps
+
+- Set up your **[Command Presets](/docs/commands-jobs)** — the core of what makes Codecurate useful.
+- Browse the **[Media Library](/docs/media-library)** and learn the filter syntax.
+- Explore the **[Compare](/docs/compare)** and **[Obtain List](/docs/obtain)** features.
+- Read the **[Deployment guide](/docs/deployment)** for production hardening.

@@ -1,0 +1,82 @@
+---
+sidebar_position: 6
+title: Obtain List
+---
+
+# Obtain List
+
+The obtain list is your media wishlist. Keep track of movies and shows you still want to add to your library. It uses TMDB for search, metadata, and artwork.
+
+## Adding items
+
+You can add items to your obtain list in several ways:
+
+### TMDB search
+
+Type a title into the search bar on the Obtain page. Codecurate queries TMDB and shows matching movies and TV shows. Click one to add it to your list with full metadata — title, year, overview, poster, backdrop, and user score.
+
+### Auto-match from filename
+
+Have a filename in mind? Use auto-match. Paste something like `The.Matrix.1999.1080p.BluRay.x264.mkv` and Codecurate extracts the title and year, searches TMDB, and saves the best match.
+
+### Manual entry
+
+If TMDB doesn't have what you're looking for, add an item manually with a title, year, and optional notes. No TMDB lookup required.
+
+## Browsing your list
+
+The obtain list shows all your entries, newest first, in a card grid. Each card displays:
+
+- Poster image (from TMDB)
+- Title and release year
+- TMDB user score
+- Overview snippet
+- Media type badge (movie or TV)
+
+### Filters and sorting
+
+| Filter | Shows |
+|---|---|
+| **All** | Everything |
+| **Auto** | Items added via auto-match |
+| **Manual** | Items you entered by hand |
+| **Custom** | Items from filename auto-match |
+| **TMDB** | Items found through TMDB search |
+
+| Sort | Order |
+|---|---|
+| **Added (newest)** | Default — newest first |
+| **Added (oldest)** | Oldest first |
+| **Score (highest)** | Best-rated first |
+| **Score (lowest)** | Lowest-rated first |
+
+### Preferred language
+
+You can pick a preferred language for TMDB metadata — overviews, titles, and taglines will be shown in that language when available. Supported: English, German, French, Spanish, Italian, or system default.
+
+## TMDB enrichment
+
+For items backed by a TMDB entry, you can explore:
+
+- **Alternate titles** — see what the movie is called in different countries
+- **Translations** — browse overviews and taglines in other languages
+
+## Removing items
+
+Delete entries you no longer need. This only removes the entry from your list — it doesn't affect any files or TMDB data.
+
+## API endpoints
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/obtain` | List all obtain items |
+| `POST /api/obtain` | Add a manual or TMDB-backed item |
+| `POST /api/obtain/auto-match` | Auto-match a filename against TMDB |
+| `DELETE /api/obtain/{id}` | Remove an item |
+| `GET /api/obtain/search?query=` | Search TMDB |
+| `GET /api/obtain/{type}/{tmdbId}/titles` | Get alternate titles |
+| `GET /api/obtain/{type}/{tmdbId}/translations` | Get translations |
+
+:::tip See also
+- **[Media Library](/docs/media-library)** — add files to your obtain list directly from the browse context menu
+:::

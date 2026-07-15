@@ -1,0 +1,286 @@
+---
+sidebar_position: 8
+title: API Reference
+---
+
+# API Reference
+
+The backend exposes a REST API on port `5000`. All endpoints except `/api/docs-yaml`, `/api/docs`, and ticket-authenticated downloads require a JWT bearer token.
+
+Base URL: `http://your-server:5000/api`
+
+:::tip Response schemas
+This reference documents request parameters and bodies. For full response schemas, use the Swagger UI at `GET /api/docs` or the OpenAPI YAML at `GET /api/docs-yaml`. The frontend's TypeScript client is generated from the OpenAPI spec — if you're building an integration, the spec is your source of truth.
+:::
+
+## Authentication
+
+Include a Bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer <your-jwt>
+```
+
+The token must be issued by the configured OIDC provider and its `azp` or `client_id` claim must match one of the allowed clients (`OIDC_ALLOWED_CLIENTS`).
+
+## Media
+
+### `GET /api/media`
+
+Paginated media listing with search, filters, and sorting.
+
+**Query parameters:**
+
+| Param | Type | Description |
+|---|---|---|
+| `search` | string | Case-insensitive match on title and path |
+| `path` | string | Restrict to a path subtree |
+| `insight_filter` | repeated string | Include files matching `kind:value` |
+| `exclude_insight_filter` | repeated string | Exclude files matching `kind:value` |
+| `audio_language` | string | Include files with matching audio language |
+| `exclude_audio_language` | string | Exclude files with matching audio language |
+| `subtitle_language` | string | Include files with matching subtitle language |
+| `exclude_subtitle_language` | string | Exclude files with matching subtitle language |
+| `limit` | int | Page size |
+| `skip` | int | Offset for pagination |
+
+**Insight filter kinds:** `video_codec`, `audio_codec`, `resolution`, `bitrate`, `format`
+
+**Examples:**
+
+```
+GET /api/media?search=matrix&insight_filter=video_codec:AV1&insight_filter=resolution:1080p
+GET /api/media?path=/media/Movies&audio_language=en&limit=50
+```
+
+### `GET /api/media/insights`
+
+Returns distributions for all filter categories. Used to render filter panels.
+
+### `GET /api/media/statistics`
+
+Returns top-level counts and shares — total files, codec distribution, resolution breakdown.
+
+### `POST /api/media/upload`
+
+Multipart file upload into a path under `MEDIA_DIR`. Max body size governed by `MEDIA_UPLOAD_MAX_BYTES`.
+
+### `POST /api/media/rename`
+
+Rename a file on disk and update stored paths.
+
+```json
+{
+  "path": "/media/Movies/Old Name.mkv",
+  "new_name": "New Name.mkv"
+}
+```
+
+### `DELETE /api/media`
+
+Delete a file from disk and remove its DB entry.
+
+```json
+{
+  "path": "/media/Movies/Some File.mkv"
+}
+```
+
+### `POST /api/media/download-ticket`
+
+Issue a short-lived download ticket for a file.
+
+```json
+{
+  "path": "/media/Movies/Some File.mkv"
+}
+```
+
+Returns a ticket string. Use it with the download endpoint.
+
+### `GET /api/media/download?ticket={ticket}`
+
+Stream a file. Ticket-bound — no JWT required.
+
+## Commands
+
+### `GET /api/commands`
+
+List all command presets.
+
+### `POST /api/commands`
+
+Create a preset.
+
+```json
+{
+  "name": "AV1 1080p Opus",
+  "description": "Convert to AV1 with Opus audio on Intel GPU",
+  "argument_template": "-hide_banner -y -i {input} -c:v av1_qsv -b:v 3M -c:a libopus -b:a 128k {output}",
+  "output_suffix": ".converted",
+  "output_extension": ".mkv",
+  "is_enabled": true,
+  "check_vmaf_score_after_running": false,
+  "delete_input_file_after_running": false,
+  "delete_input_only_if_vmaf_is_larger_than": null
+}
+```
+
+`argument_template` must contain both `{input}` and `{output}`.
+
+### `PUT /api/commands/{id}`
+
+Replace an existing preset.
+
+### `DELETE /api/commands/{id}`
+
+Remove a preset.
+
+### `POST /api/commands/{id}/run`
+
+Run a preset on a file.
+
+```json
+{
+  "input_path": "/media/Movies/A Movie.mkv"
+}
+```
+
+Returns `202 Accepted` with `process_id` and resolved output path.
+
+### `GET /api/commands/processes`
+
+List all jobs (queued, running, finished, failed).
+
+### `GET /api/commands/processes/{processId}`
+
+Get one job with full stdout and stderr logs.
+
+### `POST /api/commands/processes/{processId}/kill`
+
+Kill a running job or cancel a queued one.
+
+```json
+{
+  "delete_output": false
+}
+```
+
+### `DELETE /api/commands/processes/{processId}`
+
+Remove a finished job record. Cannot delete running or queued jobs.
+
+### `POST /api/commands/processes/clear-completed`
+
+Bulk-remove all completed entries.
+
+## Filesystem
+
+### `GET /api/filesystem`
+
+Returns a recursive folder tree of `MEDIA_DIR`. Used by the sidebar folder browser.
+
+## Compare
+
+### `GET /api/compare`
+
+Metadata compare between two files.
+
+**Query parameters:**
+
+| Param | Description |
+|---|---|
+| `left_path` | Absolute path to the reference file |
+| `right_path` | Absolute path to the comparison file |
+
+Returns a property-by-property comparison with match indicators.
+
+### `POST /api/compare/vmaf/jobs`
+
+Queue a VMAF comparison job.
+
+```json
+{
+  "left_path": "/media/Movies/source.mkv",
+  "right_path": "/media/Movies/converted.mkv"
+}
+```
+
+### `GET /api/compare/history`
+
+List recent compare history entries.
+
+### `GET /api/compare/history/{historyId}`
+
+Fetch one compare history item.
+
+### `DELETE /api/compare/history/{historyId}`
+
+Delete one history entry.
+
+### `DELETE /api/compare/history`
+
+Bulk-clear all compare history.
+
+## Obtain
+
+### `GET /api/obtain`
+
+List all obtain list items, newest first.
+
+### `POST /api/obtain`
+
+Add an item to the obtain list.
+
+```json
+{
+  "tmdb_id": 603,
+  "media_type": "movie",
+  "title": "The Matrix",
+  "release_year": 1999,
+  "overview": "A computer hacker learns the nature of reality.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/example.jpg",
+  "backdrop_url": "https://image.tmdb.org/t/p/w1280/example.jpg",
+  "user_score": 8.7
+}
+```
+
+All fields except `title` are optional. If you don't have a TMDB ID, set `tmdb_id` to `null`.
+
+### `POST /api/obtain/auto-match`
+
+Infer title and year from a filename, search TMDB, and save the best match.
+
+```json
+{
+  "path": "/media/Movies/The.Matrix.1999.1080p.mkv"
+}
+```
+
+### `DELETE /api/obtain/{id}`
+
+Remove an item from the obtain list.
+
+### `GET /api/obtain/search?query={query}`
+
+Search TMDB. Returns movies and TV shows.
+
+### `GET /api/obtain/{mediaType}/{tmdbId}/titles`
+
+Get alternate titles for a TMDB entry. `mediaType` is `movie` or `tv`.
+
+### `GET /api/obtain/{mediaType}/{tmdbId}/translations`
+
+Get translation data (overviews, taglines) for a TMDB entry.
+
+## Swagger & OpenAPI
+
+### `GET /api/docs-yaml`
+
+Returns the full OpenAPI specification as YAML. No auth required.
+
+### `GET /api/docs`
+
+Swagger UI for exploring the API interactively. No auth required.
+
+The frontend's TypeScript API client is generated from `GET /api/docs-yaml`.
